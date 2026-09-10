@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "automatic-jupyter-workflow"
-version = "0.2.0"
+version = "0.3.0"
 description = "Universal project automation for Jupyter, data science, AI, ML, coding, web, and app workflows."
 requires-python = ">=3.10"
 
