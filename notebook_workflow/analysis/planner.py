@@ -7,13 +7,13 @@ from notebook_workflow.models import ProjectPlan, ProjectRequest, ProjectType
 
 
 _DEFAULTS: dict[ProjectType, dict[str, object]] = {
-    ProjectType.JUPYTER: {"commands": ("jupyter nbconvert --execute",), "preview": "jupyter lab"},
+    ProjectType.JUPYTER: {"commands": ("python -m pytest",), "preview": "jupyter lab"},
     ProjectType.DATA_SCIENCE: {"commands": ("python -m pytest",), "preview": None},
     ProjectType.MACHINE_LEARNING: {"commands": ("python -m pytest",), "preview": None},
     ProjectType.AI: {"commands": ("python -m pytest",), "preview": None},
     ProjectType.CODING: {"commands": ("python -m pytest",), "preview": None},
-    ProjectType.WEB: {"commands": ("npm test",), "preview": "npm run dev"},
-    ProjectType.APP: {"commands": ("npx expo test",), "preview": "npx expo start"},
+    ProjectType.WEB: {"commands": ("python -m pytest",), "preview": "python -m http.server 8000"},
+    ProjectType.APP: {"commands": ("python -m pytest",), "preview": None},
     ProjectType.UNKNOWN: {"commands": (), "preview": None},
 }
 
