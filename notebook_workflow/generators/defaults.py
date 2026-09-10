@@ -1,11 +1,11 @@
 """Built-in generator registry factory."""
 
+from notebook_workflow.generators.concrete import default_concrete_generators
 from notebook_workflow.generators.registry import GeneratorRegistry
-from notebook_workflow.generators.templates import default_registry_generators
 
 
 def build_default_registry() -> GeneratorRegistry:
     registry = GeneratorRegistry()
-    for generator in default_registry_generators():
+    for generator in default_concrete_generators():
         registry.register(generator)
     return registry
