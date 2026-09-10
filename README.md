@@ -1,41 +1,56 @@
 # Automatic Jupyter Workflow → Universal Project Automation
 
-This repository is being expanded from the original Jupyter notebook workflow into a universal project automation system.
+This repository is expanding the original Jupyter workflow into a universal, security-first project automation system.
 
-## Current workflow
+## Pipeline
 
-`Requirement/reference → project-type detection → plan → generation → security scan → syntax/structure validation → safe execution checks → bounded retry → result`
+`Requirement/reference → detection → planning → generation → security scan → validation → safe execution → bounded repair/retry → report → optional ZIP package`
 
-The core workflow is **local-first and API-key-free**. Optional AI providers can be layered on later; they are not required for the deterministic foundation.
+The deterministic core is **local-first and API-key-free**. Optional AI providers can be layered on later.
 
 ## Supported project types
 
-- Jupyter notebooks (`.ipynb` generation + notebook structure validation)
-- Data Science (CSV analysis starter)
-- Machine Learning (dependency-light training/prediction starter)
-- AI (dependency-free intent classification starter)
+- Jupyter notebooks (`.ipynb`)
+- Data Science
+- Machine Learning
+- AI
 - General Coding
-- Web (HTML/CSS/JS preview-ready starter)
+- Web (HTML/CSS/JS)
 - App (Expo/React Native starter)
 
-## Security-first behavior
+## Reference input
 
-- Generated files are scanned for common hard-coded API keys, tokens, passwords, and secrets.
-- Sensitive files such as `.env` and private-key filenames are blocked from generated projects.
-- Python files are parsed with `ast` and notebooks are checked as JSON with Jupyter v4 structure.
-- Planned commands are tokenized with `shlex`, executed without a shell, and restricted to an explicit executable allowlist.
-- Execution retries are bounded to prevent infinite loops.
-- Generated projects are not automatically deployed.
+The planner can safely ingest `.txt`, `.md`, `.json`, `.csv`, and `.ipynb` references. Reference files are size-limited, parsed safely, and converted into deterministic planning hints. Unsupported, missing, oversized, malformed, or symlink references fail explicitly rather than being guessed.
+
+## Security
+
+- Scans generated text for common API keys, tokens, passwords, secrets, private keys, and GitHub tokens.
+- Blocks sensitive filenames such as `.env` and common private-key files.
+- Rejects symlinks in generated projects.
+- Validates Python syntax with `ast` and notebook structure as JSON/Jupyter v4.
+- Tokenizes commands with `shlex`, never uses `shell=True`, and restricts execution to an explicit executable allowlist.
+- Retries are bounded to prevent infinite repair loops.
+- Generated projects are never automatically deployed.
 
 ## CLI
 
-Generate a project from a requirement:
+Generate and validate:
 
 ```bash
-python -m notebook_workflow.cli "build a data science project for concrete strength analysis" --type data_science --output generated_projects/concrete --max-attempts 2
+python -m notebook_workflow.cli "build a data science project for concrete strength analysis" --type data_science --output generated_projects/concrete
 ```
 
-The CLI prints a JSON result containing success status, detected type, validation checks, security warnings/errors, attempts, and an optional preview command.
+Preview the plan without generation/execution:
+
+```bash
+python -m notebook_workflow.cli "build a web dashboard" --dry-run
+```
+
+Write a JSON report and create a sanitized ZIP after success:
+
+```bash
+python -m notebook_workflow.cli "build a coding project" --package --report generated_projects/report.json
+```
 
 ## Programmatic usage
 
@@ -53,8 +68,10 @@ result = UniversalWorkflow().run(
 print(result.success)
 ```
 
-## Development status
+## CI
 
-The Phase 1 branch now contains the universal core, concrete generators, security scanning, syntax/structure validation, safe command execution, CLI controls, tests, and GitHub Actions CI.
+GitHub Actions runs the pytest suite from `.github/workflows/tests.yml`. The connector session cannot claim local test execution, so CI results must be treated as the verification source when available.
 
-Further work will add richer reference-aware Jupyter/DS/ML generation, real dependency-aware web/app adapters, automatic repair based on captured failures, live preview orchestration, ZIP packaging, optional LLM provider adapters, and cloud/mobile execution paths.
+## Development roadmap
+
+The foundation now includes universal models, deterministic detection/planning, concrete generators, reference ingestion, security scanning, validation, safe execution, bounded repair, CLI controls, packaging, tests, and CI. Next layers are richer task-specific generation, dependency-aware web/app adapters, live preview orchestration, optional LLM adapters, and cloud/mobile execution.
