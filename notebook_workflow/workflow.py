@@ -31,6 +31,16 @@ class UniversalWorkflow:
             raise ValueError(f"Blocked executable: {tokens[0] if tokens else '<empty>'}")
         return tokens
 
+    def _validate(self, target: Path) -> ValidationResult:
+        structural = validate_project_files(target)
+        secure, security_errors, security_warnings = security_scan(target)
+        return ValidationResult(
+            structural.passed and secure,
+            errors=structural.errors + security_errors,
+            warnings=structural.warnings + security_warnings,
+            checks=structural.checks + ("security scan",),
+        )
+
     def run(self, request: ProjectRequest, *, output_dir: Path | str | None = None, max_attempts: int = 2) -> WorkflowResult:
         if max_attempts < 1 or max_attempts > 5:
             raise ValueError("max_attempts must be between 1 and 5")
@@ -42,14 +52,7 @@ class UniversalWorkflow:
             return WorkflowResult(False, plan.project_type, target, validation, attempts=0, message="Generator unavailable")
 
         generator.generate(request, plan, target)
-        validation = validate_project_files(target)
-        secure, security_errors, security_warnings = security_scan(target)
-        validation = ValidationResult(
-            validation.passed and secure,
-            errors=validation.errors + security_errors,
-            warnings=validation.warnings + security_warnings,
-            checks=validation.checks + ("security scan",),
-        )
+        validation = self._validate(target)
         if not validation.passed:
             return WorkflowResult(False, plan.project_type, target, validation, attempts=1, preview_command=plan.preview_command, message="Project failed pre-execution validation")
 
@@ -72,10 +75,13 @@ class UniversalWorkflow:
                     detail = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
                     errors.append(f"{command}: {detail}")
             if not errors:
-                warnings = validation.warnings + tuple(f"deterministic repair: {item}" for item in repair_notes)
-                final = ValidationResult(True, warnings=warnings, checks=validation.checks + ("planned commands",))
-                return WorkflowResult(True, plan.project_type, target, final, attempts=attempt, preview_command=plan.preview_command, message="Project generated, security-scanned, executed, repaired if needed, and validated")
+                post_validation = self._validate(target)
+                if post_validation.passed:
+                    warnings = post_validation.warnings + tuple(f"deterministic repair: {item}" for item in repair_notes)
+                    final = ValidationResult(True, warnings=warnings, checks=post_validation.checks + ("planned commands", "post-execution validation"))
+                    return WorkflowResult(True, plan.project_type, target, final, attempts=attempt, preview_command=plan.preview_command, message="Project generated, security-scanned, executed, repaired if needed, and validated")
+                errors.extend(post_validation.errors)
             last_errors = tuple(errors)
 
-        final = ValidationResult(False, errors=last_errors, warnings=validation.warnings + tuple(f"deterministic repair: {item}" for item in repair_notes), checks=validation.checks + ("planned commands",))
+        final = ValidationResult(False, errors=last_errors, warnings=validation.warnings + tuple(f"deterministic repair: {item}" for item in repair_notes), checks=validation.checks + ("planned commands", "post-execution validation"))
         return WorkflowResult(False, plan.project_type, target, final, attempts=max_attempts, preview_command=plan.preview_command, message="Execution checks failed after bounded retries")
