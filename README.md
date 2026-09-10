@@ -1,31 +1,51 @@
-# automatic-jupyter-workflow
-An automated Jupyter Notebook workflow for generating, processing, and managing notebooks using Python. Includes content generation, reference analysis, task processing, API integration, notebook generation, CLI tools, tests, and documentation.
-# Automatic Jupyter Notebook Workflow
+# Automatic Jupyter Workflow → Universal Project Automation
 
-This project converts structured task material into a validated Jupyter Notebook without manual copy-paste.
+This repository is being expanded from the original Jupyter notebook workflow into a universal project automation system.
 
-## Workflow
+## Current workflow
 
-Reference/task material -> analysis -> original content -> validation -> `.ipynb` -> JupyterLab
+`Requirement/reference → project-type detection → plan → generation → validation → execution checks → result`
 
-Each topic contains:
-- Explanation
-- New Example
-- Code
-- Expected Output
-- Notes
+The core workflow is **local-first and API-key-free**. Optional AI providers will be added later; they are not required for the deterministic foundation.
 
-## Run
+## Supported project types
+
+- Jupyter
+- Data Science
+- Machine Learning
+- AI
+- General Coding
+- Web
+- App
+
+## CLI
+
+Generate a starter project from a requirement:
 
 ```bash
-python -m notebook_workflow.cli
+python -m notebook_workflow.cli "build a data science project for concrete strength analysis" --type data_science --output generated_projects/concrete
 ```
 
-Programmatic usage:
+The CLI prints a JSON result containing success status, detected type, validation checks, errors/warnings, attempts, and an optional preview command.
+
+## Programmatic usage
 
 ```python
-from notebook_workflow.cli import run_workflow
-run_workflow("task.json", "generated_notebooks")
+from pathlib import Path
+from notebook_workflow.models import ProjectRequest
+from notebook_workflow.workflow import UniversalWorkflow
+
+result = UniversalWorkflow().run(
+    ProjectRequest(
+        prompt="Build a machine learning project for concrete strength prediction",
+        output_dir=Path("generated_projects/concrete_ml"),
+    )
+)
+print(result.success)
 ```
 
-The project is designed to scale from Task 1 to Task 4 and future tasks.
+## Development status
+
+Phase 1 establishes the shared models, deterministic detector/planner, generator registry, dependency-light starter generators, command runner, structural validation, universal orchestrator, CLI, tests, and GitHub Actions test workflow.
+
+Next phases add richer Jupyter/DS/ML/AI generators, real web/app project adapters, bounded auto-repair, previews, packaging, and optional AI-provider integrations while preserving the no-key core path.
