@@ -10,6 +10,7 @@ from notebook_workflow.execution.runner import CommandRunner
 from notebook_workflow.generators.defaults import build_default_registry
 from notebook_workflow.generators.registry import GeneratorRegistry
 from notebook_workflow.models import ProjectRequest, ValidationResult, WorkflowResult
+from notebook_workflow.repair import RepairEngine
 from notebook_workflow.security import security_scan
 from notebook_workflow.validation.files import validate_project_files
 
@@ -17,11 +18,12 @@ _ALLOWED_EXECUTABLES = {"python", "python3", "pytest", "jupyter", "node", "npm",
 
 
 class UniversalWorkflow:
-    """Coordinate planning, generation, safe execution, and validation."""
+    """Coordinate planning, generation, safe execution, repair, and validation."""
 
-    def __init__(self, registry: GeneratorRegistry | None = None, runner: CommandRunner | None = None) -> None:
+    def __init__(self, registry: GeneratorRegistry | None = None, runner: CommandRunner | None = None, repairer: RepairEngine | None = None) -> None:
         self.registry = registry or build_default_registry()
         self.runner = runner or CommandRunner()
+        self.repairer = repairer or RepairEngine()
 
     def _safe_command(self, command: str) -> tuple[str, ...]:
         tokens = tuple(shlex.split(command))
@@ -52,7 +54,12 @@ class UniversalWorkflow:
             return WorkflowResult(False, plan.project_type, target, validation, attempts=1, preview_command=plan.preview_command, message="Project failed pre-execution validation")
 
         last_errors: tuple[str, ...] = ()
+        repair_notes: list[str] = []
         for attempt in range(1, max_attempts + 1):
+            if attempt > 1:
+                repaired = self.repairer.repair_python_trailing_whitespace(target)
+                if repaired:
+                    repair_notes.extend(repaired)
             errors: list[str] = []
             for command in plan.commands:
                 try:
@@ -65,9 +72,10 @@ class UniversalWorkflow:
                     detail = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
                     errors.append(f"{command}: {detail}")
             if not errors:
-                final = ValidationResult(True, warnings=validation.warnings, checks=validation.checks + ("planned commands",))
-                return WorkflowResult(True, plan.project_type, target, final, attempts=attempt, preview_command=plan.preview_command, message="Project generated, security-scanned, executed, and validated")
+                warnings = validation.warnings + tuple(f"deterministic repair: {item}" for item in repair_notes)
+                final = ValidationResult(True, warnings=warnings, checks=validation.checks + ("planned commands",))
+                return WorkflowResult(True, plan.project_type, target, final, attempts=attempt, preview_command=plan.preview_command, message="Project generated, security-scanned, executed, repaired if needed, and validated")
             last_errors = tuple(errors)
 
-        final = ValidationResult(False, errors=last_errors, warnings=validation.warnings, checks=validation.checks + ("planned commands",))
+        final = ValidationResult(False, errors=last_errors, warnings=validation.warnings + tuple(f"deterministic repair: {item}" for item in repair_notes), checks=validation.checks + ("planned commands",))
         return WorkflowResult(False, plan.project_type, target, final, attempts=max_attempts, preview_command=plan.preview_command, message="Execution checks failed after bounded retries")
