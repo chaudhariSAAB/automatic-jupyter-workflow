@@ -7,17 +7,31 @@ import json
 from pathlib import Path
 
 from notebook_workflow.models import ProjectRequest, ProjectType
+from notebook_workflow.packaging import package_project
+from notebook_workflow.analysis.planner import build_plan
 from notebook_workflow.workflow import UniversalWorkflow
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate, security-scan, execute, and validate a project from a prompt.")
+    parser = argparse.ArgumentParser(description="Generate, security-scan, execute, validate, and package a project from a prompt.")
     parser.add_argument("prompt", nargs="?", help="Project requirement or task description")
     parser.add_argument("--type", choices=[item.value for item in ProjectType if item is not ProjectType.UNKNOWN])
     parser.add_argument("--reference")
     parser.add_argument("--output", default="generated_projects")
     parser.add_argument("--max-attempts", type=int, default=2, choices=range(1, 6))
+    parser.add_argument("--dry-run", action="store_true", help="Only analyze and show the plan")
+    parser.add_argument("--package", action="store_true", help="Create a sanitized ZIP after a successful run")
+    parser.add_argument("--report", help="Write the JSON result report to this path")
     return parser
+
+
+def _print_or_write(payload: dict, report: str | None) -> None:
+    text = json.dumps(payload, indent=2)
+    print(text)
+    if report:
+        path = Path(report)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -25,8 +39,15 @@ def main(argv: list[str] | None = None) -> int:
     prompt = args.prompt or input("Project requirement: ").strip()
     kind = ProjectType(args.type) if args.type else ProjectType.UNKNOWN
     request = ProjectRequest(prompt=prompt, reference=args.reference, project_type=kind, output_dir=Path(args.output))
+
+    if args.dry_run:
+        plan = build_plan(request)
+        payload = {"dry_run": True, "project_type": plan.project_type.value, "goals": list(plan.goals), "commands": list(plan.commands), "preview_command": plan.preview_command, "metadata": plan.metadata}
+        _print_or_write(payload, args.report)
+        return 0
+
     result = UniversalWorkflow().run(request, max_attempts=args.max_attempts)
-    print(json.dumps({
+    payload = {
         "success": result.success,
         "project_type": result.project_type.value,
         "output_dir": str(result.output_dir),
@@ -36,7 +57,11 @@ def main(argv: list[str] | None = None) -> int:
         "warnings": list(result.validation.warnings),
         "checks": list(result.validation.checks),
         "preview_command": result.preview_command,
-    }, indent=2))
+    }
+    if args.package and result.success:
+        archive = package_project(result.output_dir)
+        payload["package"] = str(archive)
+    _print_or_write(payload, args.report)
     return 0 if result.success else 1
 
 
