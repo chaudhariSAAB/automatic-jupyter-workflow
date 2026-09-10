@@ -11,11 +11,12 @@ from notebook_workflow.workflow import UniversalWorkflow
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate and validate a project from a prompt.")
+    parser = argparse.ArgumentParser(description="Generate, security-scan, execute, and validate a project from a prompt.")
     parser.add_argument("prompt", nargs="?", help="Project requirement or task description")
     parser.add_argument("--type", choices=[item.value for item in ProjectType if item is not ProjectType.UNKNOWN])
     parser.add_argument("--reference")
     parser.add_argument("--output", default="generated_projects")
+    parser.add_argument("--max-attempts", type=int, default=2, choices=range(1, 6))
     return parser
 
 
@@ -24,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     prompt = args.prompt or input("Project requirement: ").strip()
     kind = ProjectType(args.type) if args.type else ProjectType.UNKNOWN
     request = ProjectRequest(prompt=prompt, reference=args.reference, project_type=kind, output_dir=Path(args.output))
-    result = UniversalWorkflow().run(request)
+    result = UniversalWorkflow().run(request, max_attempts=args.max_attempts)
     print(json.dumps({
         "success": result.success,
         "project_type": result.project_type.value,
