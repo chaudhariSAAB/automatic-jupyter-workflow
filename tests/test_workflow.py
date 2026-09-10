@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from notebook_workflow.generators.registry import GeneratorRegistry
 from notebook_workflow.models import ProjectRequest, ProjectType
 from notebook_workflow.workflow import UniversalWorkflow
 
@@ -23,6 +24,8 @@ def test_workflow_generates_and_validates(tmp_path: Path):
 
 
 def test_workflow_fails_cleanly_without_generator(tmp_path: Path):
-    result = UniversalWorkflow().run(ProjectRequest(prompt="create an AI project"), output_dir=tmp_path)
+    result = UniversalWorkflow(registry=GeneratorRegistry()).run(
+        ProjectRequest(prompt="create an AI project"), output_dir=tmp_path
+    )
     assert result.success is False
     assert result.validation.errors
