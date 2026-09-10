@@ -12,12 +12,28 @@ from notebook_workflow.models import ValidationResult
 _IGNORED = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", "node_modules"}
 
 
+def _validate_notebook(path: Path, relative: Path, errors: list[str]) -> None:
+    try:
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        if (
+            not isinstance(notebook, dict)
+            or notebook.get("nbformat") != 4
+            or not isinstance(notebook.get("cells"), list)
+        ):
+            errors.append(f"Invalid notebook structure: {relative}")
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        errors.append(f"Invalid notebook JSON in {relative}: {exc}")
+
+
 def validate_project_files(project_dir: Path | str) -> ValidationResult:
     root = Path(project_dir)
     if not root.exists() or not root.is_dir():
         return ValidationResult(False, errors=(f"Project directory does not exist: {root}",))
 
-    files = [p for p in root.rglob("*") if p.is_file() and not any(part in _IGNORED for part in p.parts)]
+    files = [
+        p for p in root.rglob("*")
+        if p.is_file() and not any(part in _IGNORED for part in p.parts)
+    ]
     if not files:
         return ValidationResult(False, errors=("Project contains no usable files.",))
 
@@ -31,11 +47,11 @@ def validate_project_files(project_dir: Path | str) -> ValidationResult:
             except (SyntaxError, UnicodeDecodeError) as exc:
                 errors.append(f"Python syntax error in {relative}: {exc}")
         elif path.suffix == ".ipynb":
+            _validate_notebook(path, relative, errors)
+        elif path.suffix == ".json":
             try:
-                notebook = json.loads(path.read_text(encoding="utf-8"))
-                if notebook.get("nbformat") != 4 or not isinstance(notebook.get("cells"), list):
-                    errors.append(f"Invalid notebook structure: {relative}")
+                json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-                errors.append(f"Invalid notebook JSON in {relative}: {exc}")
+                errors.append(f"Invalid JSON in {relative}: {exc}")
 
     return ValidationResult(not errors, errors=tuple(errors), checks=tuple(checks))
