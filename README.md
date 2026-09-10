@@ -4,29 +4,38 @@ This repository is being expanded from the original Jupyter notebook workflow in
 
 ## Current workflow
 
-`Requirement/reference → project-type detection → plan → generation → validation → execution checks → result`
+`Requirement/reference → project-type detection → plan → generation → security scan → syntax/structure validation → safe execution checks → bounded retry → result`
 
-The core workflow is **local-first and API-key-free**. Optional AI providers will be added later; they are not required for the deterministic foundation.
+The core workflow is **local-first and API-key-free**. Optional AI providers can be layered on later; they are not required for the deterministic foundation.
 
 ## Supported project types
 
-- Jupyter
-- Data Science
-- Machine Learning
-- AI
+- Jupyter notebooks (`.ipynb` generation + notebook structure validation)
+- Data Science (CSV analysis starter)
+- Machine Learning (dependency-light training/prediction starter)
+- AI (dependency-free intent classification starter)
 - General Coding
-- Web
-- App
+- Web (HTML/CSS/JS preview-ready starter)
+- App (Expo/React Native starter)
+
+## Security-first behavior
+
+- Generated files are scanned for common hard-coded API keys, tokens, passwords, and secrets.
+- Sensitive files such as `.env` and private-key filenames are blocked from generated projects.
+- Python files are parsed with `ast` and notebooks are checked as JSON with Jupyter v4 structure.
+- Planned commands are tokenized with `shlex`, executed without a shell, and restricted to an explicit executable allowlist.
+- Execution retries are bounded to prevent infinite loops.
+- Generated projects are not automatically deployed.
 
 ## CLI
 
-Generate a starter project from a requirement:
+Generate a project from a requirement:
 
 ```bash
-python -m notebook_workflow.cli "build a data science project for concrete strength analysis" --type data_science --output generated_projects/concrete
+python -m notebook_workflow.cli "build a data science project for concrete strength analysis" --type data_science --output generated_projects/concrete --max-attempts 2
 ```
 
-The CLI prints a JSON result containing success status, detected type, validation checks, errors/warnings, attempts, and an optional preview command.
+The CLI prints a JSON result containing success status, detected type, validation checks, security warnings/errors, attempts, and an optional preview command.
 
 ## Programmatic usage
 
@@ -46,6 +55,6 @@ print(result.success)
 
 ## Development status
 
-Phase 1 establishes the shared models, deterministic detector/planner, generator registry, dependency-light starter generators, command runner, structural validation, universal orchestrator, CLI, tests, and GitHub Actions test workflow.
+The Phase 1 branch now contains the universal core, concrete generators, security scanning, syntax/structure validation, safe command execution, CLI controls, tests, and GitHub Actions CI.
 
-Next phases add richer Jupyter/DS/ML/AI generators, real web/app project adapters, bounded auto-repair, previews, packaging, and optional AI-provider integrations while preserving the no-key core path.
+Further work will add richer reference-aware Jupyter/DS/ML generation, real dependency-aware web/app adapters, automatic repair based on captured failures, live preview orchestration, ZIP packaging, optional LLM provider adapters, and cloud/mobile execution paths.
