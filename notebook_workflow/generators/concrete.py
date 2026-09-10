@@ -65,8 +65,9 @@ class DataScienceGenerator(BaseGenerator):
     def generate(self, request: ProjectRequest, plan: ProjectPlan, output_dir: Path) -> Iterable[str]:
         files = self._common(request, plan)
         files.update({
-            "src/main.py": """import csv\nfrom pathlib import Path\n\ndef summarize_csv(path: str) -> dict[str, float]:\n    rows = list(csv.DictReader(Path(path).open(newline='', encoding='utf-8')))\n    numeric = {}\n    for key in rows[0] if rows else {}:\n        values = [float(r[key]) for r in rows if r.get(key, '').strip()]\n        if values:\n            numeric[key] = sum(values) / len(values)\n    return numeric\n\nif __name__ == '__main__':\n    print('Data science starter ready; add a CSV and call summarize_csv().')\n""",
+            "src/main.py": """import csv\nfrom pathlib import Path\n\ndef summarize_csv(path: str) -> dict[str, float]:\n    with Path(path).open(newline='', encoding='utf-8') as handle:\n        rows = list(csv.DictReader(handle))\n    numeric = {}\n    for key in rows[0] if rows else {}:\n        values = [float(row[key]) for row in rows if row.get(key, '').strip()]\n        if values:\n            numeric[key] = sum(values) / len(values)\n    return numeric\n\nif __name__ == '__main__':\n    print(summarize_csv('data/sample.csv'))\n""",
             "data/sample.csv": "id,value\n1,10\n2,20\n3,30\n",
+            "tests/test_data_science.py": "from src.main import summarize_csv\n\n\ndef test_summarize_csv(tmp_path):\n    path = tmp_path / 'data.csv'\n    path.write_text('id,value\\n1,10\\n2,20\\n', encoding='utf-8')\n    assert summarize_csv(str(path)) == {'id': 1.5, 'value': 15.0}\n",
         })
         return self._write(output_dir, files)
 
@@ -78,8 +79,10 @@ class MachineLearningGenerator(BaseGenerator):
     def generate(self, request: ProjectRequest, plan: ProjectPlan, output_dir: Path) -> Iterable[str]:
         files = self._common(request, plan)
         files.update({
-            "src/model.py": """def nearest_mean_predict(train_x, train_y, value):\n    if not train_y:\n        raise ValueError('training data cannot be empty')\n    pairs = sorted(zip(train_x, train_y), key=lambda pair: abs(pair[0] - value))\n    return pairs[0][1]\n\nif __name__ == '__main__':\n    print(nearest_mean_predict([0, 10, 20], [0, 1, 2], 12))\n""",
-            "src/train.py": """from model import nearest_mean_predict\n\ntrain_x = [0, 10, 20]\ntrain_y = [0, 1, 2]\nprint('prediction:', nearest_mean_predict(train_x, train_y, 12))\n""",
+            "src/__init__.py": "",
+            "src/model.py": """def nearest_mean_predict(train_x, train_y, value):\n    if not train_y or len(train_x) != len(train_y):\n        raise ValueError('training data must be non-empty and aligned')\n    pairs = sorted(zip(train_x, train_y), key=lambda pair: abs(pair[0] - value))\n    return pairs[0][1]\n""",
+            "src/train.py": """from src.model import nearest_mean_predict\n\ntrain_x = [0, 10, 20]\ntrain_y = [0, 1, 2]\nprint('prediction:', nearest_mean_predict(train_x, train_y, 12))\n""",
+            "tests/test_model.py": "from src.model import nearest_mean_predict\n\n\ndef test_nearest_mean_predict():\n    assert nearest_mean_predict([0, 10, 20], [0, 1, 2], 12) == 1\n",
         })
         return self._write(output_dir, files)
 
@@ -90,7 +93,11 @@ class AIGenerator(BaseGenerator):
 
     def generate(self, request: ProjectRequest, plan: ProjectPlan, output_dir: Path) -> Iterable[str]:
         files = self._common(request, plan)
-        files["src/ai.py"] = """def classify_intent(text: str) -> str:\n    value = text.lower()\n    if any(word in value for word in ('error', 'bug', 'fail')):\n        return 'technical_support'\n    if any(word in value for word in ('learn', 'study', 'course')):\n        return 'education'\n    return 'general'\n\nif __name__ == '__main__':\n    print(classify_intent('help me study Python'))\n"""
+        files.update({
+            "src/__init__.py": "",
+            "src/ai.py": """def classify_intent(text: str) -> str:\n    value = text.lower()\n    if any(word in value for word in ('error', 'bug', 'fail')):\n        return 'technical_support'\n    if any(word in value for word in ('learn', 'study', 'course')):\n        return 'education'\n    return 'general'\n\nif __name__ == '__main__':\n    print(classify_intent('help me study Python'))\n""",
+            "tests/test_ai.py": "from src.ai import classify_intent\n\n\ndef test_classify_intent():\n    assert classify_intent('I have a bug') == 'technical_support'\n    assert classify_intent('help me study') == 'education'\n",
+        })
         files["README.md"] += "\nOptional LLM providers can be added later; no API key is required for this baseline.\n"
         return self._write(output_dir, files)
 
@@ -101,7 +108,11 @@ class CodingGenerator(BaseGenerator):
 
     def generate(self, request: ProjectRequest, plan: ProjectPlan, output_dir: Path) -> Iterable[str]:
         files = self._common(request, plan)
-        files["src/main.py"] = """def main() -> None:\n    print('Coding project ready.')\n\nif __name__ == '__main__':\n    main()\n"""
+        files.update({
+            "src/__init__.py": "",
+            "src/main.py": """def main() -> None:\n    print('Coding project ready.')\n\nif __name__ == '__main__':\n    main()\n""",
+            "tests/test_main.py": "from src.main import main\n\n\ndef test_main_callable():\n    assert callable(main)\n",
+        })
         return self._write(output_dir, files)
 
 
@@ -115,6 +126,7 @@ class WebGenerator(BaseGenerator):
             "index.html": "<!doctype html>\n<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Generated App</title><link rel='stylesheet' href='style.css'></head><body><main><h1>Generated Web Project</h1><p>Ready for your requirements.</p></main><script src='app.js'></script></body></html>\n",
             "style.css": "body{font-family:system-ui,sans-serif;margin:0;padding:3rem}main{max-width:720px;margin:auto}\n",
             "app.js": "document.title = 'Universal Project Automation';\n",
+            "tests/test_web_files.py": "from pathlib import Path\n\n\ndef test_web_entry_files_exist():\n    root = Path(__file__).parents[1]\n    assert (root / 'index.html').is_file()\n    assert (root / 'style.css').is_file()\n    assert (root / 'app.js').is_file()\n",
         })
         return self._write(output_dir, files)
 
@@ -126,7 +138,14 @@ class AppGenerator(BaseGenerator):
     def generate(self, request: ProjectRequest, plan: ProjectPlan, output_dir: Path) -> Iterable[str]:
         files = self._common(request, plan)
         files["App.js"] = "import React from 'react';\nimport { SafeAreaView, Text } from 'react-native';\n\nexport default function App() {\n  return <SafeAreaView><Text>Generated app ready.</Text></SafeAreaView>;\n}\n"
-        files["package.json"] = json.dumps({"name": "generated-app", "version": "1.0.0", "private": True, "main": "node_modules/expo/AppEntry.js", "dependencies": {"expo": "latest", "react": "latest", "react-native": "latest"}}, indent=2) + "\n"
+        files["package.json"] = json.dumps({
+            "name": "generated-app",
+            "version": "1.0.0",
+            "private": True,
+            "main": "node_modules/expo/AppEntry.js",
+            "dependencies": {"expo": "~53.0.0", "react": "19.0.0", "react-native": "0.79.2"},
+        }, indent=2) + "\n"
+        files["tests/test_app_files.py"] = "import json\nfrom pathlib import Path\n\n\ndef test_app_manifest_and_entrypoint():\n    root = Path(__file__).parents[1]\n    manifest = json.loads((root / 'package.json').read_text(encoding='utf-8'))\n    assert manifest['private'] is True\n    assert (root / 'App.js').is_file()\n"
         return self._write(output_dir, files)
 
 
