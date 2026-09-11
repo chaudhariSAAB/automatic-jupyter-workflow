@@ -1,27 +1,32 @@
+"""Preview metadata for supported project types."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
-from .models import ProjectType
+from notebook_workflow.models import ProjectType
 
 
 @dataclass(frozen=True)
 class PreviewInfo:
-    project_type: ProjectType
     command: str | None
     url: str | None
     entrypoint: str | None
 
 
-def preview_info(project_type: ProjectType, output_dir: str | Path) -> PreviewInfo:
-    root = Path(output_dir)
+def preview_info(project_type: ProjectType, root: Path) -> PreviewInfo:
+    metadata = preview_metadata(project_type, root)
+    return PreviewInfo(**metadata)
+
+
+def preview_metadata(project_type: ProjectType, root: Path) -> dict[str, str | None]:
     if project_type is ProjectType.WEB:
         candidates = (root / "src" / "index.html", root / "index.html")
         entry = next((p.name for p in candidates if p.is_file()), None)
-        return PreviewInfo(project_type, "python -m http.server 8000", "http://127.0.0.1:8000", entry)
+        return {"command": "python -m http.server 8000", "url": "http://127.0.0.1:8000", "entrypoint": entry}
     if project_type is ProjectType.APP:
-        return PreviewInfo(project_type, "npx expo start --web", "http://localhost:8081", "App.js")
+        return {"command": "npx expo start --web", "url": "http://localhost:8081", "entrypoint": "App.js"}
     if project_type is ProjectType.JUPYTER:
-        return PreviewInfo(project_type, "jupyter lab", "http://localhost:8888", None)
-    return PreviewInfo(project_type, None, None, None)
+        return {"command": "jupyter lab", "url": "http://localhost:8888", "entrypoint": None}
+    return {"command": None, "url": None, "entrypoint": None}
