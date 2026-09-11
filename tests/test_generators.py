@@ -42,9 +42,14 @@ def test_concrete_ai_generator_accepts_provider_metadata(tmp_path):
     assert manifest["ai_metadata"]["features"] == ["flashcards", "search"]
 
 
-def test_concrete_ai_generator_does_not_require_provider(tmp_path):
-    request = ProjectRequest(prompt="Build an AI starter", project_type=ProjectType.AI, output_dir=tmp_path)
+def test_legacy_ai_generator_is_compatible_with_current_request_model(tmp_path):
+    request = ProjectRequest(
+        prompt="Build an AI starter",
+        project_type=ProjectType.AI,
+        output_dir=tmp_path,
+        metadata={"name": "AI Starter", "description": "A deterministic AI baseline."},
+    )
     plan = ProjectPlan(project_type=ProjectType.AI, goals=("generate",), commands=("python -m pytest",), preview_command=None, metadata={})
-    # Legacy deterministic generator is still importable; the concrete generator is API-key-free by default.
     LegacyAIGenerator().generate(request, plan, tmp_path)
+    assert (tmp_path / "README.md").read_text(encoding="utf-8").startswith("# AI Starter")
     assert (tmp_path / "src" / "ai.py").is_file()
