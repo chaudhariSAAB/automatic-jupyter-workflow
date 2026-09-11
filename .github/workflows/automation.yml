@@ -60,7 +60,7 @@ jobs:
           PACKAGE_PROJECT: ${{ inputs.package }}
         run: |
           set -euo pipefail
-          args=("$PROMPT" --output generated_projects --max-attempts "$MAX_ATTEMPTS" --report generated_projects/report.json --ai-provider "$AI_PROVIDER")
+          args=("$PROMPT" --output generated_projects --max-attempts "$MAX_ATTEMPTS" --report generated_projects/report.json --ai-provider "$AI_PROVIDER" --factory)
           if [ "$PROJECT_TYPE" != "unknown" ]; then args+=(--type "$PROJECT_TYPE"); fi
           if [ -n "$REFERENCE" ]; then args+=(--reference "$REFERENCE"); fi
           if [ "$PACKAGE_PROJECT" = "true" ]; then args+=(--package); fi
