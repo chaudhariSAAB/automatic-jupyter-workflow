@@ -1,0 +1,75 @@
+name: Universal Project Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: Project request
+        required: true
+        type: string
+      project_type:
+        description: Project type
+        required: false
+        default: unknown
+        type: choice
+        options: [unknown, jupyter, data_science, machine_learning, ai, coding, web, app]
+      ai_provider:
+        description: Optional AI metadata provider
+        required: false
+        default: none
+        type: choice
+        options: [none, openai, openrouter, gemini]
+      reference:
+        description: Optional reference file path already in the repository
+        required: false
+        default: ''
+        type: string
+      max_attempts:
+        description: Repair attempts (1-5)
+        required: false
+        default: '2'
+        type: string
+      package:
+        description: Create a ZIP artifact
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  automate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workflow
+        run: python -m pip install -e .
+
+      - name: Generate, test, repair, and package
+        env:
+          PROMPT: ${{ inputs.prompt }}
+          PROJECT_TYPE: ${{ inputs.project_type }}
+          AI_PROVIDER: ${{ inputs.ai_provider }}
+          REFERENCE: ${{ inputs.reference }}
+          MAX_ATTEMPTS: ${{ inputs.max_attempts }}
+          PACKAGE_PROJECT: ${{ inputs.package }}
+        run: |
+          set -euo pipefail
+          args=("$PROMPT" --output generated_projects --max-attempts "$MAX_ATTEMPTS" --report generated_projects/report.json --ai-provider "$AI_PROVIDER" --factory)
+          if [ "$PROJECT_TYPE" != "unknown" ]; then args+=(--type "$PROJECT_TYPE"); fi
+          if [ -n "$REFERENCE" ]; then args+=(--reference "$REFERENCE"); fi
+          if [ "$PACKAGE_PROJECT" = "true" ]; then args+=(--package); fi
+          python -m notebook_workflow.cli "${args[@]}"
+
+      - name: Upload generated project and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-project
+          path: generated_projects/
+          if-no-files-found: warn
