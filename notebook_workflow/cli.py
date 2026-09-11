@@ -7,9 +7,10 @@ import json
 import os
 from pathlib import Path
 
+from notebook_workflow.analysis.planner import build_plan
+from notebook_workflow.factory import FactoryConfig, ProjectFactory
 from notebook_workflow.models import ProjectRequest, ProjectType
 from notebook_workflow.packaging import package_project
-from notebook_workflow.analysis.planner import build_plan
 from notebook_workflow.workflow import UniversalWorkflow
 
 
@@ -22,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-attempts", type=int, default=2, choices=range(1, 6))
     parser.add_argument("--dry-run", action="store_true", help="Only analyze and show the plan")
     parser.add_argument("--package", action="store_true", help="Create a sanitized ZIP after a successful run")
+    parser.add_argument("--factory", action="store_true", help="Use the bounded autonomous project factory")
     parser.add_argument("--report", help="Write the JSON result report to this path")
     parser.add_argument("--ai-provider", choices=["none", "openai", "openrouter", "gemini"], default=None, help="Optional AI metadata provider")
     return parser
@@ -40,18 +42,27 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     prompt = args.prompt or input("Project requirement: ").strip()
     kind = ProjectType(args.type) if args.type else ProjectType.UNKNOWN
-    request = ProjectRequest(prompt=prompt, reference=args.reference, project_type=kind, output_dir=Path(args.output))
 
     if args.dry_run:
+        request = ProjectRequest(prompt=prompt, reference=args.reference, project_type=kind, output_dir=Path(args.output))
         plan = build_plan(request)
         payload = {"dry_run": True, "project_type": plan.project_type.value, "goals": list(plan.goals), "commands": list(plan.commands), "preview_command": plan.preview_command, "metadata": plan.metadata}
         _print_or_write(payload, args.report)
         return 0
 
-    if args.ai_provider is not None:
-        os.environ["NOTEBOOK_WORKFLOW_AI_PROVIDER"] = args.ai_provider
+    provider_name = args.ai_provider or "none"
+    if args.factory:
+        result = ProjectFactory(FactoryConfig(max_attempts=args.max_attempts, ai_provider=provider_name)).run(
+            prompt,
+            project_type=kind,
+            output_dir=Path(args.output),
+        )
+    else:
+        if args.ai_provider is not None:
+            os.environ["NOTEBOOK_WORKFLOW_AI_PROVIDER"] = args.ai_provider
+        request = ProjectRequest(prompt=prompt, reference=args.reference, project_type=kind, output_dir=Path(args.output))
+        result = UniversalWorkflow().run(request, max_attempts=args.max_attempts)
 
-    result = UniversalWorkflow().run(request, max_attempts=args.max_attempts)
     payload = {
         "success": result.success,
         "project_type": result.project_type.value,
