@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from notebook_workflow.models import ProjectRequest, ProjectType
@@ -22,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true", help="Only analyze and show the plan")
     parser.add_argument("--package", action="store_true", help="Create a sanitized ZIP after a successful run")
     parser.add_argument("--report", help="Write the JSON result report to this path")
+    parser.add_argument("--ai-provider", choices=["none", "openai", "openrouter", "gemini"], default=None, help="Optional AI metadata provider")
     return parser
 
 
@@ -45,6 +47,9 @@ def main(argv: list[str] | None = None) -> int:
         payload = {"dry_run": True, "project_type": plan.project_type.value, "goals": list(plan.goals), "commands": list(plan.commands), "preview_command": plan.preview_command, "metadata": plan.metadata}
         _print_or_write(payload, args.report)
         return 0
+
+    if args.ai_provider is not None:
+        os.environ["NOTEBOOK_WORKFLOW_AI_PROVIDER"] = args.ai_provider
 
     result = UniversalWorkflow().run(request, max_attempts=args.max_attempts)
     payload = {
