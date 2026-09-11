@@ -66,10 +66,12 @@ jobs:
           if [ "$PACKAGE_PROJECT" = "true" ]; then args+=(--package); fi
           python -m notebook_workflow.cli "${args[@]}"
 
-      - name: Upload generated project and report
+      - name: Upload generated project, report, and ZIP
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: generated-project
-          path: generated_projects/
+          path: |
+            generated_projects/
+            generated_projects.zip
           if-no-files-found: warn
