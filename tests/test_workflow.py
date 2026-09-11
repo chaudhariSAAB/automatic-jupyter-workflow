@@ -11,7 +11,11 @@ class FakeGenerator:
     def generate(self, request, plan, output_dir):
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "main.py").write_text("print('generated')\n", encoding="utf-8")
-        return ("main.py",)
+        (output_dir / "test_generated.py").write_text(
+            "def test_generated_file_exists():\n    assert True\n",
+            encoding="utf-8",
+        )
+        return ("main.py", "test_generated.py")
 
 
 def test_workflow_generates_and_validates(tmp_path: Path):
