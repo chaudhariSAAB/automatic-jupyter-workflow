@@ -6,3 +6,8 @@ def test_cli_parser_accepts_project_type_and_output():
     assert args.prompt == "build a data science project"
     assert args.type == "data_science"
     assert args.output == "out"
+
+
+def test_cli_parser_accepts_optional_ai_provider():
+    args = build_parser().parse_args(["build an ai project", "--ai-provider", "openrouter"])
+    assert args.ai_provider == "openrouter"
