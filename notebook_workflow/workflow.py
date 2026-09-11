@@ -14,7 +14,31 @@ from notebook_workflow.repair import RepairEngine
 from notebook_workflow.security import security_scan
 from notebook_workflow.validation.files import validate_project_files
 
-_ALLOWED_EXECUTABLES = {"python", "python3", "pytest", "jupyter", "node", "npm", "npx", "expo"}
+_ALLOWED_COMMANDS = {
+    ("python", "-m", "pytest"),
+    ("python3", "-m", "pytest"),
+    ("pytest",),
+    ("jupyter", "lab"),
+    ("python", "-m", "http.server"),
+    ("python3", "-m", "http.server"),
+}
+
+
+def _safe_command(command: str) -> tuple[str, ...]:
+    tokens = tuple(shlex.split(command))
+    if not tokens:
+        raise ValueError("Blocked empty command")
+    prefix = tokens[:3] if len(tokens) >= 3 else tokens
+    if prefix in _ALLOWED_COMMANDS:
+        if prefix[-1] == "http.server":
+            if len(tokens) != 4 or not tokens[3].isdigit() or not 1 <= int(tokens[3]) <= 65535:
+                raise ValueError("Blocked invalid HTTP preview port")
+        elif len(tokens) != len(prefix):
+            raise ValueError("Blocked unexpected command arguments")
+        return tokens
+    if tokens == ("pytest",):
+        return tokens
+    raise ValueError(f"Blocked command: {command}")
 
 
 class UniversalWorkflow:
@@ -26,10 +50,7 @@ class UniversalWorkflow:
         self.repairer = repairer or RepairEngine()
 
     def _safe_command(self, command: str) -> tuple[str, ...]:
-        tokens = tuple(shlex.split(command))
-        if not tokens or tokens[0] not in _ALLOWED_EXECUTABLES:
-            raise ValueError(f"Blocked executable: {tokens[0] if tokens else '<empty>'}")
-        return tokens
+        return _safe_command(command)
 
     def _validate(self, target: Path) -> ValidationResult:
         structural = validate_project_files(target)
