@@ -19,6 +19,7 @@ _ALLOWED_COMMANDS = {
     ("python3", "-m", "pytest"),
     ("pytest",),
     ("jupyter", "lab"),
+    ("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace"),
     ("python", "-m", "http.server"),
     ("python3", "-m", "http.server"),
 }
@@ -28,6 +29,11 @@ def _safe_command(command: str) -> tuple[str, ...]:
     tokens = tuple(shlex.split(command))
     if not tokens:
         raise ValueError("Blocked empty command")
+    notebook_prefix = ("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace")
+    if tokens[:6] == notebook_prefix:
+        if len(tokens) != 7 or not tokens[6].endswith(".ipynb") or "/" in tokens[6] or "\\" in tokens[6]:
+            raise ValueError("Blocked invalid notebook execution target")
+        return tokens
     prefix = tokens[:3] if len(tokens) >= 3 else tokens
     if prefix in _ALLOWED_COMMANDS:
         if prefix[-1] == "http.server":
