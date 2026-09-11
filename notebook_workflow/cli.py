@@ -55,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         result = ProjectFactory(FactoryConfig(max_attempts=args.max_attempts, ai_provider=provider_name)).run(
             prompt,
             project_type=kind,
+            reference=args.reference,
             output_dir=Path(args.output),
         )
     else:
