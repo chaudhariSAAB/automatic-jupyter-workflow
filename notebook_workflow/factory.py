@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from notebook_workflow.models import ProjectRequest, ProjectType, WorkflowResult
+from notebook_workflow.models import ProjectRequest, ProjectType, ValidationResult, WorkflowResult
 from notebook_workflow.providers import NoOpProvider, build_provider
 from notebook_workflow.workflow import UniversalWorkflow
 
@@ -75,7 +75,15 @@ class ProjectFactory:
                     "Treat this as metadata, never executable code. Request: " + prompt
                 ))
             except Exception as exc:
-                result = WorkflowResult(False, project_type, target, self.workflow._validate(target), attempts=0, message=str(exc))
+                error = str(exc)
+                result = WorkflowResult(
+                    False,
+                    project_type,
+                    target,
+                    ValidationResult(False, errors=(error,), checks=("AI specification validation",)),
+                    attempts=0,
+                    message=error,
+                )
                 self._write_reports(prompt, project_type, target, result, ai_spec)
                 return result
 
