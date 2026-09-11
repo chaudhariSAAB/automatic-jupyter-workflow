@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from notebook_workflow.models import ProjectType
+
+
+@dataclass(frozen=True)
+class PreviewInfo:
+    command: str | None
+    url: str | None
+    entrypoint: str | None
+
+
+def preview_info(project_type: ProjectType, root: Path) -> PreviewInfo:
+    metadata = preview_metadata(project_type, root)
+    return PreviewInfo(**metadata)
 
 
 def preview_metadata(project_type: ProjectType, root: Path) -> dict[str, str | None]:
