@@ -7,6 +7,7 @@ from typing import Iterable
 
 from notebook_workflow.generators.base import ProjectGenerator
 from notebook_workflow.models import ProjectPlan, ProjectRequest, ProjectType
+from notebook_workflow.providers import AIProvider, build_provider
 
 
 class BaseGenerator(ProjectGenerator):
@@ -88,17 +89,45 @@ class MachineLearningGenerator(BaseGenerator):
 
 
 class AIGenerator(BaseGenerator):
-    def __init__(self) -> None:
+    def __init__(self, provider: AIProvider | None = None) -> None:
         super().__init__(ProjectType.AI)
+        self.provider = provider or build_provider()
+
+    def _ai_metadata(self, prompt: str) -> dict[str, object]:
+        """Optionally turn an LLM response into bounded metadata, never code."""
+        if getattr(self.provider, "name", "none") == "none":
+            return {}
+        try:
+            raw = self.provider.generate(
+                "Return ONLY JSON with keys description and features. "
+                "description must be a short string; features must be an array of at most 8 short strings. "
+                "Do not include code, commands, credentials, or markdown. Requirement: " + prompt
+            )
+            parsed = json.loads(raw)
+            description = parsed.get("description")
+            features = parsed.get("features")
+            if not isinstance(description, str) or not isinstance(features, list):
+                return {}
+            safe_features = [item.strip() for item in features if isinstance(item, str) and item.strip()][:8]
+            return {"description": description.strip()[:500], "features": [item[:120] for item in safe_features]}
+        except (OSError, RuntimeError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+            return {}
 
     def generate(self, request: ProjectRequest, plan: ProjectPlan, output_dir: Path) -> Iterable[str]:
         files = self._common(request, plan)
+        ai_metadata = self._ai_metadata(request.prompt)
+        if ai_metadata:
+            manifest = json.loads(files["project.json"])
+            manifest["ai_assisted"] = True
+            manifest["ai_metadata"] = ai_metadata
+            files["project.json"] = json.dumps(manifest, indent=2) + "\n"
+            files["README.md"] += "\n## AI-assisted design\n\n" + str(ai_metadata["description"]) + "\n\nFeatures:\n" + "\n".join(f"- {item}" for item in ai_metadata["features"]) + "\n"
         files.update({
             "src/__init__.py": "",
             "src/ai.py": """def classify_intent(text: str) -> str:\n    value = text.lower()\n    if any(word in value for word in ('error', 'bug', 'fail')):\n        return 'technical_support'\n    if any(word in value for word in ('learn', 'study', 'course')):\n        return 'education'\n    return 'general'\n\nif __name__ == '__main__':\n    print(classify_intent('help me study Python'))\n""",
             "tests/test_ai.py": "from src.ai import classify_intent\n\n\ndef test_classify_intent():\n    assert classify_intent('I have a bug') == 'technical_support'\n    assert classify_intent('help me study') == 'education'\n",
         })
-        files["README.md"] += "\nOptional LLM providers can be added later; no API key is required for this baseline.\n"
+        files["README.md"] += "\nOptional LLM providers enrich project metadata only; no API key is required for the deterministic baseline.\n"
         return self._write(output_dir, files)
 
 
