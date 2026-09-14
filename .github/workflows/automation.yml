@@ -131,13 +131,23 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload generated project, report, and ZIP
+      - name: Stage final artifact only
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf artifact_output
+          mkdir -p artifact_output
+          if [ -f generated_projects.zip ]; then cp generated_projects.zip artifact_output/; fi
+          if [ -f generated_projects/report.json ]; then cp generated_projects/report.json artifact_output/; fi
+          if [ -f generated_projects/workflow_report.json ]; then cp generated_projects/workflow_report.json artifact_output/; fi
+          echo 'Final artifact contents:'
+          find artifact_output -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Upload final sanitized artifact
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: generated-project
-          path: |
-            generated_projects/
-            generated_projects.zip
+          path: artifact_output/
           if-no-files-found: warn
           retention-days: 14
