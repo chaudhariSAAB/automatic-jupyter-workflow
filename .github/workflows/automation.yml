@@ -85,26 +85,35 @@ jobs:
         run: python -m pip install -r generated_projects/requirements.txt
 
       - name: Run generated project pipeline
+        working-directory: generated_projects
         run: |
           set -euo pipefail
-          cd generated_projects
           python -c "from pathlib import Path; from src.pipeline import run_analysis; print(run_analysis(Path('.')))"
 
       - name: Run generated project tests standalone
-        run: python -m pytest -q generated_projects/tests
+        working-directory: generated_projects
+        run: python -m pytest -q tests
 
-      - name: Execute generated Jupyter notebook
+      - name: Execute generated Jupyter notebook(s)
         if: ${{ hashFiles('generated_projects/notebooks/*.ipynb') != '' }}
+        working-directory: generated_projects
         run: |
           set -euo pipefail
-          cd generated_projects
-          jupyter nbconvert --to notebook --execute --inplace notebooks/concrete_strength_analysis.ipynb --ExecutePreprocessor.timeout=180
+          mapfile -t notebooks < <(find notebooks -maxdepth 1 -type f -name '*.ipynb' -print | sort)
+          if [ "${#notebooks[@]}" -eq 0 ]; then
+            echo 'No notebooks found; skipping execution.'
+            exit 0
+          fi
+          for notebook in "${notebooks[@]}"; do
+            echo "Executing $notebook"
+            jupyter nbconvert --to notebook --execute --inplace "$notebook" --ExecutePreprocessor.timeout=180
+          done
 
       - name: Final security scan and package
         if: ${{ inputs.package }}
         run: |
           set -euo pipefail
-          python -c "from pathlib import Path; from notebook_workflow.security import security_scan; from notebook_workflow.packaging import package_project; ok, errors, warnings = security_scan(Path('generated_projects')); print({'security_ok': ok, 'errors': errors, 'warnings': warnings}); raise SystemExit(0 if ok else 1)"
+          python -c "from pathlib import Path; from notebook_workflow.security import security_scan; ok, errors, warnings = security_scan(Path('generated_projects')); print({'security_ok': ok, 'errors': errors, 'warnings': warnings}); raise SystemExit(0 if ok else 1)"
           python -c "from pathlib import Path; from notebook_workflow.packaging import package_project; print(package_project(Path('generated_projects'), Path('generated_projects.zip')))"
 
       - name: Write workflow summary
