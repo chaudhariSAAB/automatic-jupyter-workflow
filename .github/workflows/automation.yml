@@ -151,6 +151,13 @@ jobs:
                   print('Expo app validation OK')
           PY
 
+      - name: Ensure Jupyter runtime is available
+        if: ${{ inputs.project_type == 'jupyter' }}
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "jupyter>=1,<2"
+          python -m jupyter --version
+
       - name: Execute generated Jupyter notebook(s)
         if: ${{ hashFiles('generated_projects/notebooks/*.ipynb') != '' }}
         working-directory: generated_projects
@@ -163,7 +170,7 @@ jobs:
           fi
           for notebook in "${notebooks[@]}"; do
             echo "Executing $notebook"
-            jupyter nbconvert --to notebook --execute --inplace "$notebook" --ExecutePreprocessor.timeout=180
+            python -m jupyter nbconvert --to notebook --execute --inplace "$notebook" --ExecutePreprocessor.timeout=180
           done
 
       - name: Final security scan and package
