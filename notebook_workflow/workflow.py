@@ -54,6 +54,7 @@ class UniversalWorkflow:
         self.registry = registry or build_default_registry()
         self.runner = runner or CommandRunner()
         self.repairer = repairer or RepairEngine()
+        self.last_plan_metadata: dict = {}
 
     def _safe_command(self, command: str) -> tuple[str, ...]:
         return _safe_command(command)
@@ -72,6 +73,7 @@ class UniversalWorkflow:
         if max_attempts < 1 or max_attempts > 5:
             raise ValueError("max_attempts must be between 1 and 5")
         plan = build_plan(request)
+        self.last_plan_metadata = dict(plan.metadata)
         target = Path(output_dir or request.output_dir)
         generator = self.registry.resolve(plan.project_type)
         if generator is None:
@@ -88,6 +90,7 @@ class UniversalWorkflow:
         for attempt in range(1, max_attempts + 1):
             if attempt > 1:
                 repaired = self.repairer.repair_python_trailing_whitespace(target)
+                repaired += self.repairer.repair_missing_python_package_markers(target)
                 if repaired:
                     repair_notes.extend(repaired)
             errors: list[str] = []
