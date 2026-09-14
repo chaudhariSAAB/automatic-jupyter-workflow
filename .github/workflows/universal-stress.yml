@@ -1,0 +1,65 @@
+name: Universal Factory Stress
+
+on:
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: Repetitions per project type
+        required: false
+        default: '2'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: universal-factory-stress
+  cancel-in-progress: false
+
+jobs:
+  stress:
+    name: Stress • ${{ matrix.project_type }} • round ${{ matrix.round }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project_type: [jupyter, data_science, machine_learning, ai, coding, web, app]
+        round: [1, 2, 3]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install workflow
+        run: python -m pip install -e ".[test]"
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Generate project
+        env:
+          TYPE: ${{ matrix.project_type }}
+          ROUND: ${{ matrix.round }}
+        run: |
+          set -euo pipefail
+          rm -rf "stress-${TYPE}-${ROUND}"
+          python -m notebook_workflow.cli "Build a robust ${TYPE} project, variation ${ROUND}" --type "$TYPE" --output "stress-${TYPE}-${ROUND}" --factory --max-attempts 3 --ai-provider none --report "stress-${TYPE}-${ROUND}/report.json"
+      - name: Validate report and security
+        env:
+          TYPE: ${{ matrix.project_type }}
+          ROUND: ${{ matrix.round }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(f"stress-{os.environ['TYPE']}-{os.environ['ROUND']}")
+          report = json.loads((root / "report.json").read_text(encoding="utf-8"))
+          assert report.get("schema_version")
+          assert report.get("project_type")
+          print("stress report OK")
+          PY
