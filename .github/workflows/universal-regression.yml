@@ -1,0 +1,145 @@
+name: Universal Regression Matrix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'notebook_workflow/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Regression • ${{ matrix.project_type }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project_type: [jupyter, data_science, machine_learning, ai, coding, web, app]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install workflow
+        run: python -m pip install -e ".[test]"
+
+      - name: Run repository tests
+        run: python -m pytest -q
+
+      - name: Generate project
+        env:
+          PROJECT_TYPE: ${{ matrix.project_type }}
+        run: |
+          set -euo pipefail
+          rm -rf generated_projects generated_projects.zip
+          python -m notebook_workflow.cli "Build a safe ${PROJECT_TYPE} starter project" \
+            --type "$PROJECT_TYPE" \
+            --output generated_projects \
+            --max-attempts 2 \
+            --report generated_projects/report.json \
+            --ai-provider none \
+            --factory
+
+      - name: Setup Node for generated package
+        if: ${{ hashFiles('generated_projects/package.json') != '' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install generated Python dependencies
+        if: ${{ hashFiles('generated_projects/requirements.txt') != '' }}
+        run: python -m pip install -r generated_projects/requirements.txt
+
+      - name: Install generated Node dependencies
+        if: ${{ hashFiles('generated_projects/package.json') != '' }}
+        working-directory: generated_projects
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Run generated tests
+        working-directory: generated_projects
+        run: python -m pytest -q tests
+
+      - name: Execute generated Python pipeline
+        if: ${{ hashFiles('generated_projects/src/pipeline.py') != '' || hashFiles('generated_projects/src/main.py') != '' || hashFiles('generated_projects/src/train.py') != '' }}
+        working-directory: generated_projects
+        run: |
+          set -euo pipefail
+          if [ -f src/pipeline.py ]; then
+            python -c "from pathlib import Path; from src.pipeline import run_analysis; print(run_analysis(Path('.')))"
+          elif [ -f src/main.py ]; then
+            python src/main.py
+          elif [ -f src/train.py ]; then
+            python src/train.py
+          fi
+
+      - name: Execute generated notebooks
+        if: ${{ hashFiles('generated_projects/notebooks/*.ipynb') != '' }}
+        working-directory: generated_projects
+        run: |
+          set -euo pipefail
+          for notebook in notebooks/*.ipynb; do
+            [ -f "$notebook" ] || continue
+            jupyter nbconvert --to notebook --execute --inplace "$notebook" --ExecutePreprocessor.timeout=180
+          done
+
+      - name: Validate generated web/app files
+        if: ${{ hashFiles('generated_projects/package.json') != '' || hashFiles('generated_projects/index.html') != '' }}
+        working-directory: generated_projects
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('.')
+          if (root / 'index.html').exists():
+              html = (root / 'index.html').read_text(encoding='utf-8')
+              for required in ("<meta name='viewport'", 'style.css', 'app.js'):
+                  assert required in html, required
+              assert (root / 'style.css').is_file()
+              assert (root / 'app.js').is_file()
+          if (root / 'package.json').exists():
+              package = json.loads((root / 'package.json').read_text(encoding='utf-8'))
+              assert package.get('private') is True
+              if 'expo' in package.get('dependencies', {}):
+                  assert (root / 'App.js').is_file()
+                  assert (root / 'app.json').is_file()
+          print('Generated source validation OK')
+          PY
+
+      - name: Security scan
+        run: |
+          python -c "from pathlib import Path; from notebook_workflow.security import security_scan; ok, errors, warnings = security_scan(Path('generated_projects')); print({'security_ok': ok, 'errors': errors, 'warnings': warnings}); raise SystemExit(0 if ok else 1)"
+
+      - name: Package and validate artifact
+        run: |
+          python -c "from pathlib import Path; from notebook_workflow.packaging import package_project; print(package_project(Path('generated_projects'), Path('generated_projects.zip')))"
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          forbidden_dirs = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.pytest_cache'}
+          forbidden_names = {'.env', '.env.local', '.env.production', 'id_rsa', 'id_ed25519'}
+          with ZipFile('generated_projects.zip') as zf:
+              bad = []
+              for name in zf.namelist():
+                  parts = Path(name).parts
+                  if any(part in forbidden_dirs for part in parts) or Path(name).name in forbidden_names:
+                      bad.append(name)
+              if bad:
+                  raise SystemExit(f'Forbidden artifact entries: {bad}')
+          print('Artifact validation OK')
+          PY
