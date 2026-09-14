@@ -11,7 +11,7 @@ def test_mobile_tool_exposes_dispatch_status_and_artifacts():
     assert "def workflow_artifacts(" in text
     assert "actions/runs" in text
     assert "/artifacts?per_page=" in text
-    assert "workflow_dispatch" in text
+    assert "workflows/automation.yml/dispatches" in text
 
 
 def test_mobile_tool_does_not_print_or_persist_token():
