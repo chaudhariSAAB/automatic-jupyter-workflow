@@ -117,7 +117,7 @@ jobs:
           sha256sum "${zip_name}" > "${zip_name}.sha256"
           sha256sum -c "${zip_name}.sha256"
       - name: Upload generated project artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a3e2f0a0c3e6a7c7d2f8a0b4e2a5c6d7e8
         with:
           name: final-${{ matrix.project_type }}-project
           path: |
