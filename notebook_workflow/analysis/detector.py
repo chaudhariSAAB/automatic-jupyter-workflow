@@ -21,7 +21,7 @@ _PATTERNS: dict[ProjectType, tuple[str, ...]] = {
 def detect_project_type(prompt: str) -> ProjectType:
     """Infer the most likely project type using transparent keyword scoring."""
     normalized = re.sub(r"\s+", " ", prompt.lower()).strip()
-    text = f" {normalized} "
+    text = " " + normalized + " "
     scores = {kind: sum(1 for pattern in patterns if pattern in text) for kind, patterns in _PATTERNS.items()}
     best = max(scores, key=scores.get)
     return best if scores[best] else ProjectType.UNKNOWN
