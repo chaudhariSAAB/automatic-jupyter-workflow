@@ -10,7 +10,7 @@ def test_mobile_tool_exposes_dispatch_status_and_artifacts():
     assert "def workflow_status(" in text
     assert "def workflow_artifacts(" in text
     assert "actions/runs" in text
-    assert "actions/artifacts" in text
+    assert "/artifacts?per_page=" in text
     assert "workflow_dispatch" in text
 
 
