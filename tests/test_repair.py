@@ -29,3 +29,10 @@ def test_repair_does_not_hide_python_syntax_errors(tmp_path: Path):
     (tmp_path / "bad.py").write_text("if True print('x')\n", encoding="utf-8")
     errors = RepairEngine().validate_python(tmp_path)
     assert errors
+
+
+def test_repair_adds_allowlisted_dependency_from_missing_module_error(tmp_path: Path):
+    (tmp_path / "requirements.txt").write_text("numpy>=1\n", encoding="utf-8")
+    repaired = RepairEngine().repair_from_errors(tmp_path, ("ModuleNotFoundError: No module named 'pandas'",))
+    assert "requirements.txt:pandas" in repaired
+    assert "pandas>=2,<3" in (tmp_path / "requirements.txt").read_text(encoding="utf-8")
