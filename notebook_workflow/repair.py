@@ -5,13 +5,16 @@ import ast
 from pathlib import Path
 
 
+_SKIP_PARTS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache"}
+
+
 class RepairEngine:
     """Attempt only deterministic, low-risk repairs; never execute repaired code."""
 
     def repair_python_trailing_whitespace(self, root: Path) -> list[str]:
         repaired: list[str] = []
         for path in root.rglob("*.py"):
-            if any(part in {".git", ".venv", "venv", "node_modules"} for part in path.parts):
+            if any(part in _SKIP_PARTS for part in path.parts):
                 continue
             text = path.read_text(encoding="utf-8")
             cleaned = "\n".join(line.rstrip() for line in text.splitlines()) + "\n"
@@ -20,10 +23,25 @@ class RepairEngine:
                 repaired.append(str(path.relative_to(root)))
         return repaired
 
+    def repair_missing_python_package_markers(self, root: Path) -> list[str]:
+        """Add __init__.py only to source directories that already contain Python files."""
+        repaired: list[str] = []
+        for directory in sorted({path.parent for path in root.rglob("*.py")}):
+            if directory == root or any(part in _SKIP_PARTS for part in directory.parts):
+                continue
+            marker = directory / "__init__.py"
+            if marker.exists():
+                continue
+            py_files = [p for p in directory.glob("*.py") if p.name != "__init__.py"]
+            if py_files:
+                marker.write_text('"""Generated package marker."""\n', encoding="utf-8")
+                repaired.append(str(marker.relative_to(root)))
+        return repaired
+
     def validate_python(self, root: Path) -> list[str]:
         errors: list[str] = []
         for path in root.rglob("*.py"):
-            if any(part in {".git", ".venv", "venv", "node_modules"} for part in path.parts):
+            if any(part in _SKIP_PARTS for part in path.parts):
                 continue
             try:
                 ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
