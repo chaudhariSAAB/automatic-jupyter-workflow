@@ -42,3 +42,29 @@ def test_openrouter_response_is_extracted(monkeypatch):
     )
     provider = providers.OpenRouterProvider(api_key="test-key")
     assert provider.generate("hello") == "generated"
+
+
+def test_provider_rejects_oversized_text(monkeypatch):
+    monkeypatch.setattr(
+        providers,
+        "_post_json",
+        lambda *args, **kwargs: {"choices": [{"message": {"content": "x" * (providers._MAX_PROVIDER_TEXT + 1)}}]},
+    )
+    provider = providers.OpenRouterProvider(api_key="test-key")
+    with pytest.raises(RuntimeError, match="oversized"):
+        provider.generate("hello")
+
+
+def test_gemini_key_is_sent_in_header(monkeypatch):
+    captured = {}
+
+    def fake_post(url, headers, payload, **kwargs):
+        captured["url"] = url
+        captured["headers"] = headers
+        return {"candidates": [{"content": {"parts": [{"text": "generated"}]}}]}
+
+    monkeypatch.setattr(providers, "_post_json", fake_post)
+    provider = providers.GeminiProvider(api_key="secret-key")
+    assert provider.generate("hello") == "generated"
+    assert "secret-key" not in captured["url"]
+    assert captured["headers"]["x-goog-api-key"] == "secret-key"
