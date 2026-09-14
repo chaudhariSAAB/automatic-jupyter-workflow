@@ -40,5 +40,6 @@ def test_non_concrete_data_science_prompt_keeps_basic_generator(tmp_path: Path):
     )
     plan = ProjectPlan(project_type=ProjectType.DATA_SCIENCE)
     PromptAwareDataScienceGenerator().generate(request, plan, tmp_path)
-    assert (tmp_path / "src/analysis.py").is_file()
+    assert (tmp_path / "src/main.py").is_file()
+    assert (tmp_path / "data/sample.csv").is_file()
     assert not (tmp_path / "data/concrete_strength.csv").exists()
