@@ -55,7 +55,7 @@ class JupyterGenerator(BaseGenerator):
             "nbformat_minor": 5,
         }
         files = self._common(request, plan)
-        files["notebook.ipynb"] = json.dumps(notebook, indent=2) + "\n"
+        files["notebooks/notebook.ipynb"] = json.dumps(notebook, indent=2) + "\n"
         return self._write(output_dir, files)
 
 
