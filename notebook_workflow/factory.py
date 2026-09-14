@@ -84,7 +84,7 @@ class ProjectFactory:
                     attempts=0,
                     message=error,
                 )
-                self._write_reports(prompt, project_type, target, result, ai_spec)
+                self._write_reports(prompt, project_type, target, result, ai_spec, {})
                 return result
 
         request = ProjectRequest(
@@ -95,12 +95,34 @@ class ProjectFactory:
             metadata={"ai_spec": ai_spec, "ai_provider": self.provider.name},
         )
         result = self.workflow.run(request, max_attempts=self.config.max_attempts)
-        self._write_reports(prompt, result.project_type, target, result, ai_spec)
+        plan_metadata = dict(getattr(self.workflow, "last_plan_metadata", {}) or {})
+        self._write_reports(prompt, result.project_type, target, result, ai_spec, plan_metadata)
         return result
 
     @staticmethod
-    def _write_reports(prompt: str, project_type: ProjectType, target: Path, result: WorkflowResult, ai_spec: dict) -> None:
-        manifest = {"prompt": prompt, "project_type": project_type.value, "ai_spec": ai_spec, "status": "success" if result.success else "failed", "attempts": result.attempts}
-        report = {"success": result.success, "project_type": result.project_type.value, "output_dir": str(result.output_dir), "attempts": result.attempts, "message": result.message, "errors": list(result.validation.errors), "warnings": list(result.validation.warnings), "checks": list(result.validation.checks), "preview_command": result.preview_command}
+    def _write_reports(prompt: str, project_type: ProjectType, target: Path, result: WorkflowResult, ai_spec: dict, plan_metadata: dict) -> None:
+        manifest = {
+            "schema_version": "1.1",
+            "prompt": prompt,
+            "project_type": project_type.value,
+            "ai_provider": "none" if not ai_spec["description"] and not ai_spec["files"] and not ai_spec["commands"] else "configured",
+            "ai_spec": ai_spec,
+            "detection": plan_metadata,
+            "status": "success" if result.success else "failed",
+            "attempts": result.attempts,
+        }
+        report = {
+            "schema_version": "1.1",
+            "success": result.success,
+            "project_type": result.project_type.value,
+            "output_dir": str(result.output_dir),
+            "attempts": result.attempts,
+            "message": result.message,
+            "errors": list(result.validation.errors),
+            "warnings": list(result.validation.warnings),
+            "checks": list(result.validation.checks),
+            "preview_command": result.preview_command,
+            "detection": plan_metadata,
+        }
         (target / "project_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         (target / "workflow_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
