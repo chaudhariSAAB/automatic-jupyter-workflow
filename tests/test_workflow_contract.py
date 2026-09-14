@@ -2,7 +2,9 @@ from pathlib import Path
 import re
 
 
-WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "automation.yml"
+ROOT = Path(__file__).parents[1]
+WORKFLOW = ROOT / ".github" / "workflows" / "automation.yml"
+REGRESSION = ROOT / ".github" / "workflows" / "universal-regression.yml"
 
 
 def test_automation_workflow_runs_generated_tests_from_project_root():
@@ -40,3 +42,14 @@ def test_automation_workflow_uploads_only_staged_final_artifacts():
     assert "mkdir -p artifact_output" in text
     assert "path: artifact_output/" in text
     assert "path: |\n            generated_projects/" not in text
+
+
+def test_parallel_regression_matrix_is_present_and_pinned():
+    text = REGRESSION.read_text(encoding="utf-8")
+    assert "fail-fast: false" in text
+    for project_type in ("jupyter", "data_science", "machine_learning", "ai", "coding", "web", "app"):
+        assert project_type in text
+    assert re.search(r"actions/checkout@[0-9a-f]{40}\b", text)
+    assert re.search(r"actions/setup-python@[0-9a-f]{40}\b", text)
+    assert "python -m jupyter nbconvert" in text
+    assert "python -m src.train" in text
