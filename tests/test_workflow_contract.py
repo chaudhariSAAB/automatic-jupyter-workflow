@@ -64,6 +64,9 @@ def test_parallel_regression_matrix_is_present_and_pinned():
     assert re.search(r"actions/setup-python@[0-9a-f]{40}\b", text)
     assert "python -m jupyter nbconvert" in text
     assert "python -m src.train" in text
+    assert "Generate deterministic SBOM" in text
+    assert "sha256sum generated_projects.zip" in text
+    assert "--max-attempts 3" in text
 
 
 def test_stress_matrix_is_parallel_and_bounded():
