@@ -1,0 +1,93 @@
+name: Final Production Verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'notebook_workflow/**'
+      - 'tests/**'
+      - 'tools/**'
+      - 'pyproject.toml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-production-verification
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Contract + security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install
+        run: python -m pip install -e ".[test]"
+      - name: Full test suite
+        run: python -m pytest -q
+      - name: Workflow security contract
+        run: python -m pytest -q tests/test_security_contract.py tests/test_workflow_contract.py tests/test_mobile_control.py
+
+  e2e:
+    name: Final E2E • ${{ matrix.project_type }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project_type: [jupyter, data_science, machine_learning, ai, coding, web, app]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install workflow
+        run: python -m pip install -e ".[test]"
+      - name: Generate
+        env:
+          PROJECT_TYPE: ${{ matrix.project_type }}
+        run: |
+          set -euo pipefail
+          rm -rf generated_projects
+          python -m notebook_workflow.cli "Build a safe ${PROJECT_TYPE} production starter" --type "$PROJECT_TYPE" --output generated_projects --max-attempts 3 --report generated_projects/report.json --ai-provider none --factory
+      - name: Install generated dependencies
+        run: |
+          set -euo pipefail
+          if [ -f generated_projects/requirements.txt ]; then python -m pip install -r generated_projects/requirements.txt; fi
+          if [ -f generated_projects/package.json ]; then cd generated_projects; if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; else npm install --ignore-scripts --no-audit --no-fund; fi; fi
+      - name: Execute generated tests and pipelines
+        working-directory: generated_projects
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests
+          if [ -f src/pipeline.py ]; then python -c "from pathlib import Path; from src.pipeline import run_analysis; print(run_analysis(Path('.')))"; fi
+          if [ -f src/main.py ]; then if [ -f src/__init__.py ]; then python -m src.main; else python src/main.py; fi; fi
+          if [ -f src/train.py ]; then if [ -f src/__init__.py ]; then python -m src.train; else python src/train.py; fi; fi
+      - name: Execute notebooks
+        if: ${{ hashFiles('generated_projects/notebooks/*.ipynb') != '' }}
+        working-directory: generated_projects
+        run: |
+          python -m pip install --disable-pip-version-check "jupyter>=1,<2"
+          while IFS= read -r notebook; do python -m jupyter nbconvert --to notebook --execute --inplace "$notebook" --ExecutePreprocessor.timeout=180; done < <(find notebooks -maxdepth 1 -name '*.ipynb' -print | sort)
+      - name: Security + SBOM
+        run: |
+          python -c "from pathlib import Path; from notebook_workflow.security import security_scan; ok, errors, warnings = security_scan(Path('generated_projects')); print({'ok':ok,'errors':errors,'warnings':warnings}); raise SystemExit(0 if ok else 1)"
+          python -c "from pathlib import Path; from notebook_workflow.sbom import generate_sbom; print(generate_sbom(Path('generated_projects')))"
+          test -f generated_projects/sbom.spdx.json
