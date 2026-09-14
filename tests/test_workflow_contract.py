@@ -41,7 +41,15 @@ def test_automation_workflow_uploads_only_staged_final_artifacts():
     assert "name: Stage final artifact only" in text
     assert "mkdir -p artifact_output" in text
     assert "path: artifact_output/" in text
+    assert "project_manifest.json" in text
     assert "path: |\n            generated_projects/" not in text
+
+
+def test_automation_workflow_is_reusable():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "workflow_call:" in text
+    assert "type: boolean" in text
+    assert "type: string" in text
 
 
 def test_parallel_regression_matrix_is_present_and_pinned():
