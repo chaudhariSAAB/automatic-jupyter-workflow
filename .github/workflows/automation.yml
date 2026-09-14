@@ -124,6 +124,28 @@ jobs:
           python -c "from pathlib import Path; from notebook_workflow.security import security_scan; ok, errors, warnings = security_scan(Path('generated_projects')); print({'security_ok': ok, 'errors': errors, 'warnings': warnings}); raise SystemExit(0 if ok else 1)"
           python -c "from pathlib import Path; from notebook_workflow.packaging import package_project; print(package_project(Path('generated_projects'), Path('generated_projects.zip')))"
 
+      - name: Validate packaged artifact hygiene
+        if: ${{ inputs.package && hashFiles('generated_projects.zip') != '' }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          archive = Path('generated_projects.zip')
+          forbidden_dirs = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.pytest_cache'}
+          forbidden_names = {'.env', '.env.local', '.env.production', 'id_rsa', 'id_ed25519'}
+          bad = []
+          with ZipFile(archive) as zf:
+              for name in zf.namelist():
+                  parts = Path(name).parts
+                  if any(part in forbidden_dirs for part in parts) or Path(name).name in forbidden_names:
+                      bad.append(name)
+          if bad:
+              raise SystemExit(f'Forbidden files in artifact: {bad}')
+          print(f'Artifact hygiene OK: {len(ZipFile(archive).namelist())} files')
+          PY
+
       - name: Write workflow summary
         if: always()
         run: |
@@ -145,7 +167,10 @@ jobs:
           set -euo pipefail
           rm -rf artifact_output
           mkdir -p artifact_output
-          if [ -f generated_projects.zip ]; then cp generated_projects.zip artifact_output/; fi
+          if [ -f generated_projects.zip ]; then
+            cp generated_projects.zip artifact_output/
+            sha256sum generated_projects.zip > artifact_output/generated_projects.zip.sha256
+          fi
           if [ -f generated_projects/report.json ]; then cp generated_projects/report.json artifact_output/; fi
           if [ -f generated_projects/workflow_report.json ]; then cp generated_projects/workflow_report.json artifact_output/; fi
           echo 'Final artifact contents:'
