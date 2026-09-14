@@ -39,6 +39,8 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: universal-project-automation
@@ -178,13 +180,14 @@ jobs:
           forbidden_names = {'.env', '.env.local', '.env.production', 'id_rsa', 'id_ed25519'}
           bad = []
           with ZipFile(archive) as zf:
-              for name in zf.namelist():
+              names = zf.namelist()
+              for name in names:
                   parts = Path(name).parts
                   if any(part in forbidden_dirs for part in parts) or Path(name).name in forbidden_names:
                       bad.append(name)
           if bad:
               raise SystemExit(f'Forbidden files in artifact: {bad}')
-          print(f'Artifact hygiene OK: {len(ZipFile(archive).namelist())} files')
+          print(f'Artifact hygiene OK: {len(names)} files')
           PY
 
       - name: Write workflow summary
@@ -216,6 +219,12 @@ jobs:
           if [ -f generated_projects/workflow_report.json ]; then cp generated_projects/workflow_report.json artifact_output/; fi
           echo 'Final artifact contents:'
           find artifact_output -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Generate artifact attestation
+        if: ${{ inputs.package && hashFiles('artifact_output/generated_projects.zip') != '' }}
+        uses: actions/attest@v4
+        with:
+          subject-path: artifact_output/generated_projects.zip
 
       - name: Upload final sanitized artifact
         if: always()
