@@ -60,6 +60,13 @@ jobs:
           python-version: '3.12'
           cache: pip
 
+      - name: Setup Node.js for generated web/app projects
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+        if: ${{ inputs.project_type == 'web' || inputs.project_type == 'app' || inputs.project_type == 'unknown' }}
+
       - name: Install workflow
         run: python -m pip install -e ".[test]"
 
@@ -80,9 +87,14 @@ jobs:
           if [ -n "$REFERENCE" ]; then args+=(--reference "$REFERENCE"); fi
           python -m notebook_workflow.cli "${args[@]}"
 
-      - name: Install generated project dependencies
+      - name: Install generated Python project dependencies
         if: ${{ hashFiles('generated_projects/requirements.txt') != '' }}
         run: python -m pip install -r generated_projects/requirements.txt
+
+      - name: Install generated Node/Expo project dependencies
+        if: ${{ hashFiles('generated_projects/package.json') != '' }}
+        working-directory: generated_projects
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Run generated project pipeline when available
         working-directory: generated_projects
@@ -101,6 +113,35 @@ jobs:
       - name: Run generated project tests standalone
         working-directory: generated_projects
         run: python -m pytest -q tests
+
+      - name: Validate generated web/app source files
+        if: ${{ hashFiles('generated_projects/package.json') != '' || hashFiles('generated_projects/index.html') != '' }}
+        working-directory: generated_projects
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('.')
+          if (root / 'index.html').exists():
+              html = (root / 'index.html').read_text(encoding='utf-8')
+              required = ('<meta name=\'viewport\'', 'style.css', 'app.js')
+              missing = [item for item in required if item not in html]
+              if missing:
+                  raise SystemExit(f'Web project missing required content: {missing}')
+              for name in ('style.css', 'app.js'):
+                  if not (root / name).is_file():
+                      raise SystemExit(f'Missing web asset: {name}')
+              print('Web project validation OK')
+          if (root / 'package.json').exists():
+              package = json.loads((root / 'package.json').read_text(encoding='utf-8'))
+              if not package.get('private'):
+                  raise SystemExit('Generated app package must be private')
+              if 'expo' in package.get('dependencies', {}):
+                  if not (root / 'App.js').is_file() or not (root / 'app.json').is_file():
+                      raise SystemExit('Expo project missing App.js or app.json')
+                  print('Expo app validation OK')
+          PY
 
       - name: Execute generated Jupyter notebook(s)
         if: ${{ hashFiles('generated_projects/notebooks/*.ipynb') != '' }}
