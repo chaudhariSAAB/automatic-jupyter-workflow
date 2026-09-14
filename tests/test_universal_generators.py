@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from notebook_workflow.generators.defaults import build_default_registry
-from notebook_workflow.models import ProjectRequest, ProjectType
+from notebook_workflow.models import ProjectPlan, ProjectRequest, ProjectType
 from notebook_workflow.security import security_scan
 from notebook_workflow.validation.files import validate_project_files
 
@@ -21,7 +21,7 @@ def test_every_project_type_has_a_safe_generator(tmp_path: Path, project_type: P
     )
     generator = build_default_registry().resolve(project_type)
     assert generator is not None
-    plan = type("Plan", (), {"project_type": project_type})()
+    plan = ProjectPlan(project_type=project_type)
     generator.generate(request, plan, output)
 
     structural = validate_project_files(output)
