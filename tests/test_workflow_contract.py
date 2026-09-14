@@ -18,6 +18,14 @@ def test_automation_workflow_executes_all_generated_notebooks():
     assert "concrete_strength_analysis.ipynb" not in text
 
 
+def test_automation_workflow_supports_non_datascience_projects():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "Run generated project pipeline when available" in text
+    assert "elif [ -f src/main.py ]; then" in text
+    assert "elif [ -f src/train.py ]; then" in text
+    assert "No standalone Python pipeline entrypoint; relying on generated tests." in text
+
+
 def test_automation_workflow_keeps_security_and_packaging_after_validation():
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "security_scan" in text
