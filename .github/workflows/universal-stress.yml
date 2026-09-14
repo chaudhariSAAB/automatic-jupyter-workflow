@@ -58,8 +58,10 @@ jobs:
           import json, os
           from pathlib import Path
           root = Path(f"stress-{os.environ['TYPE']}-{os.environ['ROUND']}")
-          report = json.loads((root / "report.json").read_text(encoding="utf-8"))
-          assert report.get("schema_version")
-          assert report.get("project_type")
-          print("stress report OK")
+          report = json.loads((root / "workflow_report.json").read_text(encoding="utf-8"))
+          assert report.get("schema_version") == "1.1"
+          assert report.get("success") is True
+          assert report.get("project_type") == os.environ["TYPE"]
+          assert "security scan" in report.get("checks", [])
+          print("stress workflow report OK")
           PY
