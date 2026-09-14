@@ -20,6 +20,6 @@ def test_jupyter_generator_emits_valid_notebook(tmp_path: Path):
     generator = next(g for g in default_concrete_generators() if g.project_type is ProjectType.JUPYTER)
     target = tmp_path / "notebook"
     generator.generate(ProjectRequest(prompt="civil engineering lab"), ProjectPlan(ProjectType.JUPYTER), target)
-    notebook = json.loads((target / "notebook.ipynb").read_text(encoding="utf-8"))
+    notebook = json.loads((target / "notebooks" / "notebook.ipynb").read_text(encoding="utf-8"))
     assert notebook["nbformat"] == 4
     assert any(cell["cell_type"] == "code" for cell in notebook["cells"])
