@@ -53,7 +53,7 @@ jobs:
           python -m notebook_workflow.cli "Build a safe ${PROJECT_TYPE} starter project" \
             --type "$PROJECT_TYPE" \
             --output generated_projects \
-            --max-attempts 2 \
+            --max-attempts 3 \
             --report generated_projects/report.json \
             --ai-provider none \
             --factory
@@ -76,7 +76,8 @@ jobs:
       - name: Install generated Node dependencies
         if: ${{ hashFiles('generated_projects/package.json') != '' }}
         working-directory: generated_projects
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: |
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; else npm install --ignore-scripts --no-audit --no-fund; fi
 
       - name: Run generated tests
         working-directory: generated_projects
@@ -134,9 +135,13 @@ jobs:
         run: |
           python -c "from pathlib import Path; from notebook_workflow.security import security_scan; ok, errors, warnings = security_scan(Path('generated_projects')); print({'security_ok': ok, 'errors': errors, 'warnings': warnings}); raise SystemExit(0 if ok else 1)"
 
+      - name: Generate deterministic SBOM
+        run: python -c "from pathlib import Path; from notebook_workflow.sbom import generate_sbom; print(generate_sbom(Path('generated_projects')))"
+
       - name: Package and validate artifact
         run: |
           python -c "from pathlib import Path; from notebook_workflow.packaging import package_project; print(package_project(Path('generated_projects'), Path('generated_projects.zip')))"
+          sha256sum generated_projects.zip > generated_projects.zip.sha256
           python - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
@@ -150,5 +155,7 @@ jobs:
                       bad.append(name)
               if bad:
                   raise SystemExit(f'Forbidden artifact entries: {bad}')
-          print('Artifact validation OK')
+          sbom = Path('generated_projects/sbom.spdx.json')
+          assert sbom.is_file(), 'SBOM missing'
+          print('Artifact validation and SBOM OK')
           PY
