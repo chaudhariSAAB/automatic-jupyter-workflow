@@ -1,10 +1,10 @@
-# Automatic Jupyter Workflow → Universal Project Automation Factory v1.0
+# Automatic Jupyter Workflow → Universal Project Automation Factory v1.1
 
 This repository has evolved from an automatic Jupyter workflow into a universal, security-first project automation factory.
 
 ## Pipeline
 
-`Requirement/reference → detection → planning → generation → dependency setup → security scan → validation → safe execution → bounded repair/retry → tests → report → sanitized ZIP → checksum → artifact attestation`
+`Requirement/reference → detection → confidence → planning → generation → dependency setup → security scan → validation → safe execution → bounded repair/retry → tests → report → sanitized ZIP → checksum → artifact attestation`
 
 The deterministic core is **local-first and API-key-free**. Optional AI providers can be layered on later.
 
@@ -20,7 +20,11 @@ The deterministic core is **local-first and API-key-free**. Optional AI provider
 | Web | ✅ | HTML/CSS/JS project |
 | App | ✅ | Expo/React Native starter |
 
-All seven supported project types have passed end-to-end workflow testing.
+All seven supported project types have passed end-to-end workflow testing. A parallel regression matrix is also available under `.github/workflows/universal-regression.yml`.
+
+## Universal detection
+
+When `project_type` is `unknown`, the factory deterministically scores the request and reference hints, records confidence and matched keywords, and falls back to a safe dependency-light Coding generator when the request is genuinely ambiguous. This prevents a universal request from failing simply because classification is uncertain.
 
 ## Security boundary
 
@@ -30,20 +34,25 @@ All seven supported project types have passed end-to-end workflow testing.
 - Validates Python syntax with `ast` and notebook structure as JSON/Jupyter v4.
 - Tokenizes commands with `shlex`, never uses `shell=True`, and restricts execution to an explicit executable allowlist.
 - Retries are bounded to prevent infinite repair loops.
+- Deterministic repair can normalize Python whitespace and add missing `__init__.py` markers only where Python modules already exist.
 - Generated projects are never automatically deployed.
 - Generated ZIPs exclude repository metadata, virtual environments, caches, Node modules, and known secret filenames.
 - Final ZIPs receive a SHA-256 checksum and, when packaging is enabled in GitHub Actions, a signed artifact attestation.
 
-GitHub artifact attestations provide provenance and integrity information linking an artifact to its repository, workflow, commit, and triggering event. citeturn1search0turn1search2
+## Optional AI providers
 
-## Reference input
-
-The planner safely ingests `.txt`, `.md`, `.json`, `.csv`, and `.ipynb` references. Reference files are size-limited, parsed safely, and converted into deterministic planning hints. Unsupported, missing, oversized, malformed, or symlink references fail explicitly rather than being guessed.
+AI providers are **metadata-only** in the factory. Provider output is size-limited and schema-validated before it can influence the workflow. Provider HTTP errors are normalized without logging response bodies. Gemini API keys are sent through a request header instead of a URL.
 
 ## CLI
 
 ```bash
 python -m notebook_workflow.cli "build a data science project for concrete strength analysis" --type data_science --output generated_projects/concrete
+```
+
+Automatic type detection:
+
+```bash
+python -m notebook_workflow.cli "build a mobile app for tracking engineering attendance" --factory
 ```
 
 Preview without generation/execution:
@@ -60,13 +69,18 @@ python -m notebook_workflow.cli "build a coding project" --package --report gene
 
 ## CI / E2E
 
-- `.github/workflows/tests.yml` runs the pytest regression suite across Python 3.10–3.13.
+- `.github/workflows/tests.yml` runs the pytest regression suite across Python versions.
 - `.github/workflows/automation.yml` provides the manual Universal Project Automation workflow.
+- `.github/workflows/universal-regression.yml` runs the seven supported project types in parallel with `fail-fast: false`.
 - The automation workflow performs preflight tests, generation, dependency installation, execution, standalone generated tests, notebook execution, final security scanning, ZIP hygiene validation, checksum creation, and artifact upload.
-- Packaged outputs can receive GitHub artifact attestations for provenance/integrity verification. citeturn1search1turn1search2
+- Packaged outputs can receive GitHub artifact attestations for provenance/integrity verification.
 
-## v1.0 readiness
+## Mobile control
 
-The v1.0 foundation is complete: universal models, deterministic detection/planning, concrete generators, reference ingestion, security scanning, structural validation, safe execution, bounded repair, CLI controls, packaging, regression tests, CI, seven successful E2E project types, sanitized artifacts, checksums, and artifact provenance support.
+GitHub's Actions UI and workflow-dispatch API allow the same factory to be started remotely without the user's PC running. The recommended mobile-control architecture is a thin authenticated dispatcher that submits a workflow request and reads run status/artifacts; project secrets stay in GitHub Actions secrets and are never placed in the generated project.
 
-Future expansion areas are richer task-specific generation, dependency-aware adapters, live preview orchestration, optional LLM adapters, and cloud/mobile execution.
+## v1.1 hardening status
+
+The v1.1 hardening pass adds confidence-aware automatic detection, safe ambiguity fallback, richer machine-readable provenance, deterministic package-marker repair, hardened optional providers, and a parallel seven-project regression matrix.
+
+See `docs/UNIVERSAL_FACTORY_ROADMAP.md` for the remaining expansion plan.
