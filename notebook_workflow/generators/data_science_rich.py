@@ -33,10 +33,7 @@ def _dataset() -> str:
             - 0.11 * water + 1.1 * superplasticizer + 0.12 * age
             + 0.006 * (fine - 650) - 0.002 * (coarse - 900) + 18
         )
-        rows.append([
-            cement, slag, fly_ash, water, superplasticizer,
-            coarse, fine, age, round(strength, 2),
-        ])
+        rows.append([cement, slag, fly_ash, water, superplasticizer, coarse, fine, age, round(strength, 2)])
     lines = [",".join(CSV_HEADER)]
     lines.extend(",".join(str(value) for value in row) for row in rows)
     return "\n".join(lines) + "\n"
@@ -50,10 +47,7 @@ import json
 import math
 from pathlib import Path
 
-FEATURES = [
-    "cement", "slag", "fly_ash", "water", "superplasticizer",
-    "coarse_aggregate", "fine_aggregate", "age_days",
-]
+FEATURES = ["cement", "slag", "fly_ash", "water", "superplasticizer", "coarse_aggregate", "fine_aggregate", "age_days"]
 TARGET = "strength_mpa"
 
 
@@ -195,11 +189,7 @@ def describe(rows):
     result = {}
     for key in rows[0]:
         values = [row[key] for row in rows]
-        result[key] = {
-            "min": min(values),
-            "mean": sum(values) / len(values),
-            "max": max(values),
-        }
+        result[key] = {"min": min(values), "mean": sum(values) / len(values), "max": max(values)}
     return result
 '''
 
@@ -224,42 +214,21 @@ __all__ = ["_svg_age", "_svg_scatter"]
 TEST = r'''import json
 from pathlib import Path
 
-from notebook_workflow.generators.data_science_rich import ConcreteStrengthGenerator, _dataset
-from notebook_workflow.models import ProjectPlan, ProjectRequest, ProjectType
-from notebook_workflow.validation.files import validate_project_files
 
-
-def test_concrete_generator_creates_complete_project(tmp_path):
-    request = ProjectRequest(
-        prompt="Create a complete beginner-friendly Data Science project for concrete strength analysis.",
-        project_type=ProjectType.DATA_SCIENCE,
-        output_dir=tmp_path,
-    )
-    plan = ProjectPlan(project_type=ProjectType.DATA_SCIENCE, goals=(request.prompt,))
-    ConcreteStrengthGenerator().generate(request, plan, tmp_path)
-    expected = [
-        "data/concrete_strength.csv",
-        "notebooks/concrete_strength_analysis.ipynb",
-        "src/data_cleaning.py",
-        "src/eda.py",
-        "src/model.py",
-        "src/evaluate.py",
-        "src/visualization.py",
-        "src/pipeline.py",
-        "README.md",
-        "requirements.txt",
-    ]
+def test_concrete_project_files_and_notebook_are_valid():
+    root = Path(__file__).parents[1]
+    expected = ["data/concrete_strength.csv", "notebooks/concrete_strength_analysis.ipynb", "src/data_cleaning.py", "src/eda.py", "src/model.py", "src/evaluate.py", "src/visualization.py", "src/pipeline.py", "README.md", "requirements.txt"]
     for relative in expected:
-        assert (tmp_path / relative).is_file(), relative
-    result = validate_project_files(tmp_path)
-    assert result.passed, result.errors
-    notebook = json.loads((tmp_path / "notebooks/concrete_strength_analysis.ipynb").read_text(encoding="utf-8"))
+        assert (root / relative).is_file(), relative
+    notebook = json.loads((root / "notebooks/concrete_strength_analysis.ipynb").read_text(encoding="utf-8"))
     assert notebook["nbformat"] == 4
-    assert len(notebook["cells"]) >= 8
+    assert len(notebook["cells"]) >= 12
+    assert any("prediction" in "".join(cell.get("source", [])).lower() for cell in notebook["cells"])
+    assert any("visual" in "".join(cell.get("source", [])).lower() for cell in notebook["cells"])
 
 
-def test_dataset_is_deterministic_and_has_expected_columns():
-    lines = _dataset().strip().splitlines()
+def test_dataset_has_expected_shape_and_columns():
+    lines = (Path(__file__).parents[1] / "data" / "concrete_strength.csv").read_text(encoding="utf-8").strip().splitlines()
     assert lines[0].split(",")[-1] == "strength_mpa"
     assert len(lines) == 41
 '''
@@ -268,17 +237,21 @@ NOTEBOOK = {
     "cells": [
         {"cell_type": "markdown", "metadata": {}, "source": ["# Concrete Strength Analysis\n", "\n", "Beginner-friendly end-to-end data science project generated automatically.\n"]},
         {"cell_type": "markdown", "metadata": {}, "source": ["## Problem statement\n", "Predict concrete compressive strength (MPa) from mix composition and curing age.\n"]},
-        {"cell_type": "markdown", "metadata": {}, "source": ["## 1. Imports and setup\n"]},
-        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["from pathlib import Path\n", "import sys\n", "sys.path.append('..')\n", "from src.pipeline import load_clean_rows, summarize, fit_linear_regression, predict, evaluate\n"]},
-        {"cell_type": "markdown", "metadata": {}, "source": ["## 2. Load and clean data\n"]},
-        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["rows = load_clean_rows(Path('../data/concrete_strength.csv'))\n", "print('Rows:', len(rows))\n", "print('First row:', rows[0])\n"]},
-        {"cell_type": "markdown", "metadata": {}, "source": ["## 3. Exploratory data analysis\n", "The generated pipeline also writes SVG visualizations for cement-vs-strength and strength-vs-age relationships.\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 1. Imports and setup\n", "We use the project modules and keep the analysis reproducible.\n"]},
+        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["from pathlib import Path\n", "import sys\n", "sys.path.append('..')\n", "from IPython.display import SVG, display\n", "from src.pipeline import load_clean_rows, summarize, fit_linear_regression, predict, evaluate\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 2. Load and clean data\n", "Malformed or non-numeric rows are skipped by the cleaning function.\n"]},
+        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["rows = load_clean_rows(Path('../data/concrete_strength.csv'))\n", "print('Rows:', len(rows))\n", "print('Columns:', list(rows[0]))\n", "print('First row:', rows[0])\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 3. Exploratory data analysis\n", "Compare ingredients, curing age, and compressive strength using summary statistics.\n"]},
         {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["summary = summarize(rows)\n", "summary['strength_mpa']\n"]},
-        {"cell_type": "markdown", "metadata": {}, "source": ["## 4. Train the regression model\n"]},
-        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["train, test = rows[:30], rows[30:]\n", "model = fit_linear_regression(train)\n", "predictions = predict(model, test)\n"]},
-        {"cell_type": "markdown", "metadata": {}, "source": ["## 5. Model evaluation\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 4. Visual analysis\n", "The pipeline creates SVG charts for cement vs strength and average strength by curing age.\n"]},
+        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["display(SVG('../reports/figures/strength_vs_cement.svg'))\n", "display(SVG('../reports/figures/strength_by_age.svg'))\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 5. Train the regression model\n", "The model uses the concrete mix features and curing age to predict compressive strength.\n"]},
+        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["train, test = rows[:30], rows[30:]\n", "model = fit_linear_regression(train)\n", "predictions = predict(model, test)\n", "print('Training rows:', len(train), 'Test rows:', len(test))\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 6. Model evaluation\n", "MAE and RMSE measure prediction error; R² measures explained variance.\n"]},
         {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["metrics = evaluate([row['strength_mpa'] for row in test], predictions)\n", "metrics\n"]},
-        {"cell_type": "markdown", "metadata": {}, "source": ["## 6. Interpretation\n", "Use MAE and RMSE to understand average prediction error and R² to estimate explained variance.\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 7. Prediction examples\n", "The following examples show actual strength versus the model prediction for test samples.\n"]},
+        {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": ["for row, predicted in list(zip(test, predictions))[:5]:\n", "    print({'age_days': int(row['age_days']), 'actual_mpa': row['strength_mpa'], 'predicted_mpa': round(predicted, 2)})\n"]},
+        {"cell_type": "markdown", "metadata": {}, "source": ["## 8. Interpretation and reproducibility\n", "The dataset is synthetic and educational. The project requires no API key and can regenerate its reports and figures deterministically.\n"]},
     ],
     "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}, "language_info": {"name": "python", "version": "3"}},
     "nbformat": 4,
@@ -287,8 +260,6 @@ NOTEBOOK = {
 
 
 class ConcreteStrengthGenerator(ProjectGenerator):
-    """Generate a complete concrete-strength DS project without external packages."""
-
     project_type = ProjectType.DATA_SCIENCE
 
     def _write(self, root: Path, files: dict[str, str]) -> list[str]:
@@ -302,8 +273,8 @@ class ConcreteStrengthGenerator(ProjectGenerator):
 
     def generate(self, request: ProjectRequest, plan: ProjectPlan, output_dir: Path) -> Iterable[str]:
         files = {
-            "README.md": """# Concrete Strength Analysis\n\nA beginner-friendly, reproducible Data Science project that analyzes a synthetic concrete mix dataset and predicts compressive strength in MPa.\n\n## Workflow\n1. Load and clean the dataset.\n2. Explore descriptive statistics.\n3. Create meaningful SVG visualizations.\n4. Train a deterministic multiple linear regression model.\n5. Evaluate with MAE, RMSE, and R².\n6. Save machine-readable reports.\n\n## Project structure\n- `data/concrete_strength.csv` — reproducible sample dataset.\n- `notebooks/concrete_strength_analysis.ipynb` — guided Jupyter analysis.\n- `src/` — cleaning, EDA, modeling, evaluation, visualization, and pipeline modules.\n- `reports/` — generated metrics, summary, and SVG figures after execution.\n- `tests/` — automated structural and dataset tests.\n\n## Reproducibility\nThe project uses only the Python standard library; no API keys, internet access, or external services are required.\n\n## Important\nThe dataset is synthetic and educational. It must not be used as an engineering design basis.\n""",
-            "requirements.txt": "# No third-party dependencies required; standard library only.\n",
+            "README.md": """# Concrete Strength Analysis\n\nA beginner-friendly, reproducible Data Science project that analyzes a synthetic concrete mix dataset and predicts compressive strength in MPa.\n\n## Workflow\n1. Load and clean the dataset.\n2. Explore descriptive statistics and ingredient/age relationships.\n3. Create meaningful SVG visualizations.\n4. Train a deterministic multiple linear regression model.\n5. Evaluate with MAE, RMSE, and R².\n6. Generate prediction examples.\n7. Save machine-readable reports.\n\n## Run\n```bash\npip install -r requirements.txt\npython -c \"from pathlib import Path; from src.pipeline import run_analysis; print(run_analysis(Path('.')))\"\npytest -q\n```\n\n## Project structure\n- `data/concrete_strength.csv` — reproducible sample dataset.\n- `notebooks/concrete_strength_analysis.ipynb` — guided Jupyter analysis.\n- `src/` — cleaning, EDA, modeling, evaluation, visualization, and pipeline modules.\n- `reports/` — generated metrics, summary, and SVG figures after execution.\n- `tests/` — standalone automated tests.\n\n## Reproducibility\nThe analysis code itself uses only the Python standard library. Jupyter and pytest are included as tools for the notebook and tests. No API keys, internet access, or external AI services are required.\n\n## Important\nThe dataset is synthetic and educational. It must not be used as an engineering design basis.\n""",
+            "requirements.txt": "pytest>=8,<10\njupyter>=1,<2\n",
             "data/concrete_strength.csv": _dataset(),
             "src/__init__.py": "",
             "src/data_cleaning.py": DATA_CLEANING,
@@ -314,20 +285,12 @@ class ConcreteStrengthGenerator(ProjectGenerator):
             "src/pipeline.py": PIPELINE,
             "tests/test_concrete_project.py": TEST,
             "notebooks/concrete_strength_analysis.ipynb": json.dumps(NOTEBOOK, indent=2) + "\n",
-            "project.json": json.dumps({
-                "name": "concrete-strength-analysis",
-                "project_type": "data_science",
-                "description": request.prompt,
-                "features": ["data cleaning", "EDA", "visualizations", "linear regression", "model evaluation", "Jupyter notebook", "automated tests", "JSON reports"],
-                "dependencies": [],
-            }, indent=2) + "\n",
+            "project.json": json.dumps({"name": "concrete-strength-analysis", "project_type": "data_science", "description": request.prompt, "features": ["data cleaning", "EDA", "visualizations", "linear regression", "model evaluation", "prediction examples", "Jupyter notebook", "automated tests", "JSON reports"], "dependencies": ["pytest", "jupyter"]}, indent=2) + "\n",
         }
         return self._write(output_dir, files)
 
 
 class PromptAwareDataScienceGenerator(ProjectGenerator):
-    """Use the complete concrete template when the request is concrete-strength focused."""
-
     project_type = ProjectType.DATA_SCIENCE
 
     def __init__(self) -> None:
