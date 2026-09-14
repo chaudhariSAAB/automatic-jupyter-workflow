@@ -36,6 +36,37 @@ on:
         required: false
         default: true
         type: boolean
+  workflow_call:
+    inputs:
+      prompt:
+        description: Project request
+        required: true
+        type: string
+      project_type:
+        description: Project type or unknown for automatic detection
+        required: false
+        default: unknown
+        type: string
+      ai_provider:
+        description: Optional AI metadata provider
+        required: false
+        default: none
+        type: string
+      reference:
+        description: Optional reference file path already in the repository
+        required: false
+        default: ''
+        type: string
+      max_attempts:
+        description: Repair attempts (1-5)
+        required: false
+        default: '2'
+        type: string
+      package:
+        description: Create a ZIP artifact
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -152,7 +183,7 @@ jobs:
           PY
 
       - name: Ensure Jupyter runtime is available
-        if: ${{ inputs.project_type == 'jupyter' }}
+        if: ${{ inputs.project_type == 'jupyter' || hashFiles('generated_projects/notebooks/*.ipynb') != '' }}
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check "jupyter>=1,<2"
@@ -229,6 +260,7 @@ jobs:
           fi
           if [ -f generated_projects/report.json ]; then cp generated_projects/report.json artifact_output/; fi
           if [ -f generated_projects/workflow_report.json ]; then cp generated_projects/workflow_report.json artifact_output/; fi
+          if [ -f generated_projects/project_manifest.json ]; then cp generated_projects/project_manifest.json artifact_output/; fi
           echo 'Final artifact contents:'
           find artifact_output -maxdepth 1 -type f -printf '%f\n' | sort
 
