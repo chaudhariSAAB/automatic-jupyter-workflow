@@ -61,11 +61,10 @@ jobs:
           cache: pip
 
       - name: Setup Node.js for generated web/app projects
+        if: ${{ inputs.project_type == 'web' || inputs.project_type == 'app' || inputs.project_type == 'unknown' }}
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-        if: ${{ inputs.project_type == 'web' || inputs.project_type == 'app' || inputs.project_type == 'unknown' }}
 
       - name: Install workflow
         run: python -m pip install -e ".[test]"
@@ -125,7 +124,7 @@ jobs:
           root = Path('.')
           if (root / 'index.html').exists():
               html = (root / 'index.html').read_text(encoding='utf-8')
-              required = ('<meta name=\'viewport\'', 'style.css', 'app.js')
+              required = ("<meta name='viewport'", 'style.css', 'app.js')
               missing = [item for item in required if item not in html]
               if missing:
                   raise SystemExit(f'Web project missing required content: {missing}')
