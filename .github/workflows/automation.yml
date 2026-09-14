@@ -171,7 +171,6 @@ jobs:
               for name in ('style.css', 'app.js'):
                   if not (root / name).is_file():
                       raise SystemExit(f'Missing web asset: {name}')
-              print('Web project validation OK')
           if (root / 'package.json').exists():
               package = json.loads((root / 'package.json').read_text(encoding='utf-8'))
               if not package.get('private'):
@@ -179,7 +178,7 @@ jobs:
               if 'expo' in package.get('dependencies', {}):
                   if not (root / 'App.js').is_file() or not (root / 'app.json').is_file():
                       raise SystemExit('Expo project missing App.js or app.json')
-                  print('Expo app validation OK')
+          print('Generated source validation OK')
           PY
 
       - name: Ensure Jupyter runtime is available
@@ -195,14 +194,13 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t notebooks < <(find notebooks -maxdepth 1 -type f -name '*.ipynb' -print | sort)
-          if [ "${#notebooks[@]}" -eq 0 ]; then
-            echo 'No notebooks found; skipping execution.'
-            exit 0
-          fi
           for notebook in "${notebooks[@]}"; do
             echo "Executing $notebook"
             python -m jupyter nbconvert --to notebook --execute --inplace "$notebook" --ExecutePreprocessor.timeout=180
           done
+
+      - name: Generate deterministic SBOM
+        run: python -c "from pathlib import Path; from notebook_workflow.sbom import generate_sbom; print(generate_sbom(Path('generated_projects')))"
 
       - name: Final security scan and package
         if: ${{ inputs.package }}
@@ -243,9 +241,8 @@ jobs:
             echo "- AI provider: ${{ inputs.ai_provider }}"
             echo "- Repair attempts: ${{ inputs.max_attempts }}"
             echo "- Package requested: ${{ inputs.package }}"
-            if [ -f generated_projects/report.json ]; then
-              echo '- Report: generated_projects/report.json'
-            fi
+            if [ -f generated_projects/report.json ]; then echo '- Report: generated_projects/report.json'; fi
+            if [ -f generated_projects/sbom.spdx.json ]; then echo '- SBOM: generated_projects/sbom.spdx.json'; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Stage final artifact only
@@ -258,10 +255,9 @@ jobs:
             cp generated_projects.zip artifact_output/
             sha256sum generated_projects.zip > artifact_output/generated_projects.zip.sha256
           fi
-          if [ -f generated_projects/report.json ]; then cp generated_projects/report.json artifact_output/; fi
-          if [ -f generated_projects/workflow_report.json ]; then cp generated_projects/workflow_report.json artifact_output/; fi
-          if [ -f generated_projects/project_manifest.json ]; then cp generated_projects/project_manifest.json artifact_output/; fi
-          echo 'Final artifact contents:'
+          for file in report.json workflow_report.json project_manifest.json sbom.spdx.json; do
+            if [ -f "generated_projects/$file" ]; then cp "generated_projects/$file" artifact_output/; fi
+          done
           find artifact_output -maxdepth 1 -type f -printf '%f\n' | sort
 
       - name: Generate artifact attestation
@@ -269,6 +265,12 @@ jobs:
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
           subject-path: artifact_output/generated_projects.zip
+
+      - name: Generate SBOM attestation
+        if: ${{ inputs.package && hashFiles('artifact_output/sbom.spdx.json') != '' }}
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: artifact_output/sbom.spdx.json
 
       - name: Upload final sanitized artifact
         if: always()
