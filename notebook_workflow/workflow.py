@@ -91,6 +91,7 @@ class UniversalWorkflow:
             if attempt > 1:
                 repaired = self.repairer.repair_python_trailing_whitespace(target)
                 repaired += self.repairer.repair_missing_python_package_markers(target)
+                repaired += self.repairer.repair_from_errors(target, last_errors)
                 if repaired:
                     repair_notes.extend(repaired)
             errors: list[str] = []
