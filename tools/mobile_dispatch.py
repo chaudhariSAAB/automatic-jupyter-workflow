@@ -7,6 +7,7 @@ Environment:
 Examples:
   python tools/mobile_dispatch.py "build a pandas sales analysis" --type data_science
   python tools/mobile_dispatch.py status --run-id 123456789
+  python tools/mobile_dispatch.py artifacts --run-id 123456789
 """
 from __future__ import annotations
 
@@ -67,6 +68,11 @@ def workflow_status(run_id: int | None = None, limit: int = 5) -> dict:
     return _request(f"/repos/{repo}/actions/runs?{query}", token=token)
 
 
+def workflow_artifacts(run_id: int) -> dict:
+    token, repo = _credentials()
+    return _request(f"/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100", token=token)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command")
@@ -81,6 +87,9 @@ def main() -> None:
     status_parser.add_argument("--run-id", type=int)
     status_parser.add_argument("--limit", type=int, default=5)
 
+    artifact_parser = sub.add_parser("artifacts")
+    artifact_parser.add_argument("--run-id", type=int, required=True)
+
     parser.add_argument("prompt", nargs="?")
     parser.add_argument("--type", default="unknown", choices=["unknown", "jupyter", "data_science", "machine_learning", "ai", "coding", "web", "app"])
     parser.add_argument("--ai-provider", default="none", choices=["none", "openai", "openrouter", "gemini"])
@@ -89,12 +98,14 @@ def main() -> None:
 
     if args.command == "status":
         print(json.dumps(workflow_status(args.run_id, args.limit), indent=2))
+    elif args.command == "artifacts":
+        print(json.dumps(workflow_artifacts(args.run_id), indent=2))
     elif args.command == "run":
         print(json.dumps(dispatch(args.prompt, args.type, args.ai_provider, args.max_attempts), indent=2))
     elif args.prompt:
         print(json.dumps(dispatch(args.prompt, args.type, args.ai_provider, args.max_attempts), indent=2))
     else:
-        parser.error("provide a prompt or use the status command")
+        parser.error("provide a prompt, status, or artifacts command")
 
 
 if __name__ == "__main__":
