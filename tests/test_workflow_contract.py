@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "automation.yml"
@@ -30,7 +31,7 @@ def test_automation_workflow_keeps_security_and_packaging_after_validation():
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "security_scan" in text
     assert "package_project" in text
-    assert "actions/upload-artifact@v6" in text
+    assert re.search(r"actions/upload-artifact@[0-9a-f]{40}\b", text)
 
 
 def test_automation_workflow_uploads_only_staged_final_artifacts():
