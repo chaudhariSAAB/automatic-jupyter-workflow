@@ -5,6 +5,7 @@ import re
 ROOT = Path(__file__).parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "automation.yml"
 REGRESSION = ROOT / ".github" / "workflows" / "universal-regression.yml"
+STRESS = ROOT / ".github" / "workflows" / "universal-stress.yml"
 
 
 def test_automation_workflow_runs_generated_tests_from_project_root():
@@ -33,6 +34,7 @@ def test_automation_workflow_keeps_security_and_packaging_after_validation():
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "security_scan" in text
     assert "package_project" in text
+    assert "Generate deterministic SBOM" in text
     assert re.search(r"actions/upload-artifact@[0-9a-f]{40}\b", text)
 
 
@@ -42,6 +44,7 @@ def test_automation_workflow_uploads_only_staged_final_artifacts():
     assert "mkdir -p artifact_output" in text
     assert "path: artifact_output/" in text
     assert "project_manifest.json" in text
+    assert "sbom.spdx.json" in text
     assert "path: |\n            generated_projects/" not in text
 
 
@@ -61,3 +64,10 @@ def test_parallel_regression_matrix_is_present_and_pinned():
     assert re.search(r"actions/setup-python@[0-9a-f]{40}\b", text)
     assert "python -m jupyter nbconvert" in text
     assert "python -m src.train" in text
+
+
+def test_stress_matrix_is_parallel_and_bounded():
+    text = STRESS.read_text(encoding="utf-8")
+    assert "fail-fast: false" in text
+    assert "round: [1, 2, 3]" in text
+    assert "--max-attempts 3" in text
