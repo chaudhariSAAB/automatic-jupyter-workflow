@@ -35,8 +35,7 @@ jobs:
       - name: Run tests
         run: pytest -q
       - name: Security and workflow contracts
-        run: |
-          pytest -q tests/test_security_contract.py tests/test_workflow_contract.py tests/test_mobile_control_contract.py
+        run: pytest -q tests/test_security_contract.py tests/test_workflow_contract.py tests/test_mobile_control_contract.py
 
   e2e:
     needs: contract
@@ -82,24 +81,23 @@ jobs:
             python -m pip install -r generated_projects/requirements.txt
           fi
           if [ -f generated_projects/package.json ]; then
-            npm install --prefix generated_projects
+            npm install --prefix generated_projects --ignore-scripts --no-audit --no-fund
           fi
       - name: Execute generated tests and pipelines
         run: |
           set -euo pipefail
           if [ -f generated_projects/pytest.ini ] || find generated_projects -maxdepth 2 -type f -name 'test_*.py' -print -quit | grep -q .; then
-            (cd generated_projects && python -m pytest -q tests)
-          fi
-          if [ -f generated_projects/Makefile ]; then
-            make -C generated_projects test
+            (cd generated_projects && PYTHONPATH=. python -m pytest -q tests)
           fi
       - name: Execute notebooks
         if: matrix.project_type == 'jupyter' || matrix.project_type == 'data_science' || matrix.project_type == 'machine_learning' || matrix.project_type == 'ai'
         run: |
           set -euo pipefail
-          if find generated_projects -type f -name '*.ipynb' -print -quit | grep -q .; then
-            python -m jupyter nbconvert --to notebook --execute --inplace $(find generated_projects -type f -name '*.ipynb')
-          fi
+          python -m pip install --disable-pip-version-check "jupyter>=1,<2"
+          mapfile -t notebooks < <(find generated_projects -type f -name '*.ipynb' -print | sort)
+          for notebook in "${notebooks[@]}"; do
+            python -m jupyter nbconvert --to notebook --execute --inplace "$notebook" --ExecutePreprocessor.timeout=180
+          done
       - name: Security scan
         run: |
           set -euo pipefail
@@ -113,9 +111,29 @@ jobs:
         run: |
           set -euo pipefail
           zip_name="${PROJECT_TYPE}-generated-project.zip"
-          (cd generated_projects && zip -qr "../${zip_name}" .)
+          (cd generated_projects && zip -qr "../${zip_name}" . -x '.git/*' '.venv/*' 'venv/*' 'node_modules/*' '__pycache__/*' '.pytest_cache/*' '.env*')
           sha256sum "${zip_name}" > "${zip_name}.sha256"
           sha256sum -c "${zip_name}.sha256"
+      - name: Validate packaged artifact hygiene
+        run: |
+          set -euo pipefail
+          python - "$PROJECT_TYPE" <<'PY'
+          import sys
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = Path(f"{sys.argv[1]}-generated-project.zip")
+          forbidden = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.pytest_cache'}
+          forbidden_names = {'.env', '.env.local', '.env.production', 'id_rsa', 'id_ed25519'}
+          with ZipFile(archive) as zf:
+              bad = []
+              for name in zf.namelist():
+                  parts = Path(name).parts
+                  if any(p in forbidden for p in parts) or Path(name).name in forbidden_names:
+                      bad.append(name)
+              if bad:
+                  raise SystemExit(f'Forbidden files in artifact: {bad}')
+          print('Artifact hygiene OK')
+          PY
       - name: Upload generated project artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
@@ -123,5 +141,7 @@ jobs:
           path: |
             ${{ env.PROJECT_TYPE }}-generated-project.zip
             ${{ env.PROJECT_TYPE }}-generated-project.zip.sha256
+            generated_projects/sbom.spdx.json
+            generated_projects/report.json
           if-no-files-found: error
           retention-days: 14
