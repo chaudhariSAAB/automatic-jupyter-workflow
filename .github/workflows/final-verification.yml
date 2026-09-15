@@ -88,7 +88,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f generated_projects/pytest.ini ] || find generated_projects -maxdepth 2 -type f -name 'test_*.py' -print -quit | grep -q .; then
-            pytest -q generated_projects
+            (cd generated_projects && python -m pytest -q tests)
           fi
           if [ -f generated_projects/Makefile ]; then
             make -C generated_projects test
@@ -103,7 +103,7 @@ jobs:
       - name: Security scan
         run: |
           set -euo pipefail
-          python tools/security_scan.py generated_projects
+          python -c "from pathlib import Path; from notebook_workflow.security import security_scan; ok, errors, warnings = security_scan(Path('generated_projects')); print({'security_ok': ok, 'errors': errors, 'warnings': warnings}); raise SystemExit(0 if ok else 1)"
       - name: Generate SBOM
         run: |
           set -euo pipefail
