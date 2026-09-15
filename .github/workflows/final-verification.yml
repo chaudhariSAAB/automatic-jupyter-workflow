@@ -39,6 +39,7 @@ jobs:
 
   e2e:
     needs: contract
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
