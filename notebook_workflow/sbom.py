@@ -1,6 +1,7 @@
 """Deterministic, dependency-file SBOM generation for generated projects."""
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -59,3 +60,17 @@ def generate_sbom(root: Path, output: Path | None = None) -> Path:
     }
     output.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     return output
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Generate a deterministic SPDX JSON SBOM.")
+    parser.add_argument("root", type=Path)
+    parser.add_argument("--output", type=Path, default=None)
+    args = parser.parse_args()
+    result = generate_sbom(args.root, args.output)
+    print(result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
