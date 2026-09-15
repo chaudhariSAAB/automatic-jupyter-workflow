@@ -108,11 +108,15 @@ jobs:
           set -euo pipefail
           python -m notebook_workflow.sbom generated_projects --output generated_projects/sbom.spdx.json
           test -f generated_projects/sbom.spdx.json
+      - name: Remove runtime caches before packaging
+        run: |
+          set -euo pipefail
+          find generated_projects -type d \( -name '__pycache__' -o -name '.pytest_cache' -o -name '.mypy_cache' \) -prune -exec rm -rf {} +
       - name: Package project and checksum
         run: |
           set -euo pipefail
           zip_name="${PROJECT_TYPE}-generated-project.zip"
-          (cd generated_projects && zip -qr "../${zip_name}" . -x '.git/*' '.venv/*' 'venv/*' 'node_modules/*' '__pycache__/*' '.pytest_cache/*' '.env*')
+          (cd generated_projects && zip -qr "../${zip_name}" . -x '.git/*' '.venv/*' 'venv/*' 'node_modules/*' '__pycache__/*' '.pytest_cache/*' '.mypy_cache/*' '.env*')
           sha256sum "${zip_name}" > "${zip_name}.sha256"
           sha256sum -c "${zip_name}.sha256"
       - name: Validate packaged artifact hygiene
@@ -123,7 +127,7 @@ jobs:
           from pathlib import Path
           from zipfile import ZipFile
           archive = Path(f"{sys.argv[1]}-generated-project.zip")
-          forbidden = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.pytest_cache'}
+          forbidden = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.pytest_cache', '.mypy_cache'}
           forbidden_names = {'.env', '.env.local', '.env.production', 'id_rsa', 'id_ed25519'}
           with ZipFile(archive) as zf:
               bad = []
