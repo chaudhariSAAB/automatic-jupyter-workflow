@@ -36,7 +36,7 @@ jobs:
         run: pytest -q
       - name: Security and workflow contracts
         run: |
-          pytest -q tests/test_security_contract.py tests/test_workflow_contract.py tests/test_mobile_control_contract.py
+          pytest -q tests/test_security_contract.py tests/test_workflow_contract.py tests/test_mobile_control.py
 
   e2e:
     needs: contract
